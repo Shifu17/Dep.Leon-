@@ -27,10 +27,11 @@ from .comun import error, info
 from .pagina_config import PaginaConfig
 from .pagina_equipos import PaginaEquipos
 from .pagina_ligas import PaginaLigas
+from .pagina_rol import PaginaRol
 
 ALTO_BANNER = 84
 MINUTOS_ENTRE_REVISIONES = 30
-ETAPAS_PENDIENTES = ["Rol de juegos", "Estadísticas", "Cobros", "Liguilla", "Reportes"]
+ETAPAS_PENDIENTES = ["Estadísticas", "Cobros", "Liguilla", "Reportes"]
 
 
 class _Senales(QObject):
@@ -54,10 +55,14 @@ class Ventana(QMainWindow):
         self.pila = QStackedWidget()
         self.ligas = PaginaLigas(conn)
         self.equipos = PaginaEquipos(conn)
+        self.rol = PaginaRol(conn)
         self.config = PaginaConfig(conn)
         self.ligas.datos_cambiados.connect(self.equipos.refrescar)
+        self.ligas.datos_cambiados.connect(self.rol.refrescar)
+        self.equipos.datos_cambiados.connect(self.rol.refrescar)
         self.config.datos_cambiados.connect(self.ligas.refrescar)
         self.config.datos_cambiados.connect(self.equipos.refrescar)
+        self.config.datos_cambiados.connect(self.rol.refrescar)
         self.config.buscar_actualizacion.connect(lambda: self.revisar_actualizacion(manual=True))
 
         contenido = QWidget(objectName="contenido")
@@ -115,6 +120,7 @@ class Ventana(QMainWindow):
 
         agregar("Ligas y categorías", self.ligas)
         agregar("Equipos y jugadores", self.equipos).click()
+        agregar("Rol de juegos", self.rol)
         for texto in ETAPAS_PENDIENTES:
             pendiente = QPushButton(texto, objectName="nav", enabled=False)
             pendiente.setToolTip("Disponible en una próxima etapa")

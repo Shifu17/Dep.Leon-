@@ -48,6 +48,25 @@ CREATE TABLE IF NOT EXISTS jugadores (
     UNIQUE (equipo_id, numero),
     UNIQUE (equipo_id, nombre, fecha_nacimiento)
 );
+CREATE TABLE IF NOT EXISTS partidos (
+    id INTEGER PRIMARY KEY,
+    torneo_id INTEGER NOT NULL REFERENCES torneos(id) ON DELETE RESTRICT,
+    categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE RESTRICT,
+    jornada INTEGER NOT NULL,
+    local_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE RESTRICT,
+    visitante_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE RESTRICT,
+    fecha TEXT,
+    hora TEXT,
+    minutos INTEGER NOT NULL,
+    cancha TEXT,
+    estado TEXT NOT NULL,
+    CHECK (local_id <> visitante_id)
+);
+CREATE INDEX IF NOT EXISTS partidos_fecha ON partidos (fecha);
+CREATE TABLE IF NOT EXISTS config_rol (
+    torneo_id INTEGER PRIMARY KEY REFERENCES torneos(id) ON DELETE CASCADE,
+    datos TEXT NOT NULL
+);
 """
 
 LIGAS_INICIALES = [
@@ -122,6 +141,8 @@ def restaurar(conn: sqlite3.Connection, origen: Path | str, fotos_dir: Path) -> 
                 if not {"ligas", "categorias", "torneos", "equipos", "jugadores"} <= tablas:
                     raise ValueError(error)
                 fuente.backup(conn)
+                # Un respaldo de una versión anterior puede no traer las tablas nuevas.
+                conn.executescript(ESQUEMA)
             finally:
                 fuente.close()
             for nombre in archivo.namelist():

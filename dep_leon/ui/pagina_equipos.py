@@ -341,6 +341,9 @@ class PaginaEquipos(QWidget):
         equipo = self.conn.execute("SELECT * FROM equipos WHERE id = ?", (equipo_id,)).fetchone()
         dialogo = DialogoEquipo(self, self._categorias(), equipo)
         if dialogo.exec():
+            if dialogo.categoria.currentData() != equipo["categoria_id"] and self._tiene_partidos(equipo_id):
+                error(self, "No se puede cambiar de categoría: el equipo ya tiene partidos en el rol.")
+                return
             self._guardar_equipo(
                 "UPDATE equipos SET categoria_id = ?, nombre = ?, responsable = ?, telefono = ? "
                 "WHERE id = ?",
@@ -367,6 +370,13 @@ class PaginaEquipos(QWidget):
         if equipo_id is None:
             error(self, "Primero selecciona un equipo.")
             return
+        if self._tiene_partidos(equipo_id):
+            error(
+                self,
+                "No se puede eliminar: el equipo tiene partidos en el rol. "
+                "Elimina esos partidos o genera de nuevo el rol sin él.",
+            )
+            return
         if not confirmar(self, "¿Eliminar este equipo y todos sus jugadores?"):
             return
         fotos = self.conn.execute(
@@ -377,6 +387,15 @@ class PaginaEquipos(QWidget):
         for f in fotos:
             borrar_foto(f["foto"], fotos_dir())
         self._avisar_cambio()
+
+    def _tiene_partidos(self, equipo_id) -> bool:
+        return (
+            self.conn.execute(
+                "SELECT 1 FROM partidos WHERE local_id = ? OR visitante_id = ? LIMIT 1",
+                (equipo_id, equipo_id),
+            ).fetchone()
+            is not None
+        )
 
     def _categoria_del_equipo(self, equipo_id):
         return self.conn.execute(

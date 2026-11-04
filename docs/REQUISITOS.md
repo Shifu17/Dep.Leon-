@@ -54,7 +54,9 @@ Tarjetas, sanciones, asistencia, exportación a Excel de tablas, varias computad
 
 1. Ligas, categorías, torneos, equipos y jugadores, con importación desde Excel, credenciales,
    respaldo y actualizaciones. **Hecha.**
-2. Rol de juegos.
+2. Rol de juegos: generación automática por categoría, descansos, control de empalmes, edición,
+   reprogramación y partidos pospuestos. **Hecha.** La opción de default con equipo que paga se
+   completa en las etapas 3 y 4; la hoja del rol en PDF e imagen, en la etapa 6.
 3. Resultados y estadísticas.
 4. Cobros.
 5. Liguilla.

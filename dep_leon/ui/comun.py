@@ -62,11 +62,11 @@ def id_seleccionado(tabla_: QTableWidget) -> int | None:
     return tabla_.item(fila, 0).data(Qt.ItemDataRole.UserRole)
 
 
-def botones_dialogo(dialogo: QDialog, al_aceptar) -> QDialogButtonBox:
+def botones_dialogo(dialogo: QDialog, al_aceptar, texto: str = "Guardar") -> QDialogButtonBox:
     caja = QDialogButtonBox(
         QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
     )
-    caja.button(QDialogButtonBox.StandardButton.Save).setText("Guardar")
+    caja.button(QDialogButtonBox.StandardButton.Save).setText(texto)
     cancelar = caja.button(QDialogButtonBox.StandardButton.Cancel)
     cancelar.setText("Cancelar")
     cancelar.setObjectName("secundario")
