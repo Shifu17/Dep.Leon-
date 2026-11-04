@@ -163,6 +163,10 @@ class DialogoPartido(QDialog):
 
         if partido:
             self.categoria.setEnabled(False)
+            # Con resultado capturado, cambiar de equipos dejaría goles de otro partido.
+            if partido["estado"] in (rol.JUGADO, rol.DEFAULT):
+                self.local.setEnabled(False)
+                self.visitante.setEnabled(False)
             self.local.setCurrentIndex(self.local.findData(partido["local_id"]))
             self.visitante.setCurrentIndex(self.visitante.findData(partido["visitante_id"]))
             self.jornada.setValue(partido["jornada"])
@@ -491,7 +495,9 @@ class PaginaRol(QWidget):
                     "hora = ?, minutos = ?, cancha = ?, estado = ? WHERE id = ?",
                     (
                         dialogo.jornada.value(), local, visitante, fecha.isoformat(), rol.a_hora(hora),
-                        minutos, cancha, rol.PROGRAMADO, partido["id"],
+                        minutos, cancha,
+                        rol.PROGRAMADO if partido["estado"] == rol.POSPUESTO else partido["estado"],
+                        partido["id"],
                     ),
                 )
             self._al_cambiar_torneo()
@@ -503,13 +509,23 @@ class PaginaRol(QWidget):
         if partido["estado"] == rol.POSPUESTO:
             error(self, "Este partido ya está pospuesto. Usa «Editar o reprogramar» para darle fecha.")
             return
+        if partido["estado"] in (rol.JUGADO, rol.DEFAULT):
+            error(self, "Este partido ya tiene resultado. Bórralo en «Resultados» antes de posponerlo.")
+            return
         if confirmar(self, "¿Posponer este partido? Quedará sin fecha y se liberará su cancha."):
             rol.posponer(self.conn, partido["id"])
             self._al_cambiar_torneo()
 
     def eliminar(self):
         partido = self._partido_seleccionado()
-        if partido is not None and confirmar(self, "¿Eliminar este partido del rol?"):
+        if partido is None:
+            return
+        aviso = (
+            "Este partido ya tiene resultado. ¿Eliminarlo junto con su marcador y sus goles?"
+            if partido["estado"] in (rol.JUGADO, rol.DEFAULT)
+            else "¿Eliminar este partido del rol?"
+        )
+        if confirmar(self, aviso):
             with self.conn:
                 self.conn.execute("DELETE FROM partidos WHERE id = ?", (partido["id"],))
             self._al_cambiar_torneo()

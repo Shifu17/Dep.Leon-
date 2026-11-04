@@ -25,6 +25,7 @@ computadora, con una cuenta de acceso y código de recuperación.
 - Puntos: 3 por victoria, 1 por empate, 0 por derrota (configurable).
 - Desempate: diferencia de goles, goles a favor y resultado entre ambos equipos.
 - La liguilla no suma a la tabla regular, pero sí al goleo.
+- Una categoría con resultados no se puede generar de nuevo, para no perderlos.
 - Portero menos goleado: se lleva **por equipo** (goles recibidos); no se elige portero por partido.
 - Horario de referencia del rol infantil: partidos cada 50 minutos desde las 9:00.
 
@@ -56,9 +57,11 @@ usuarios.
 1. Ligas, categorías, torneos, equipos y jugadores, con importación desde Excel, credenciales,
    respaldo y actualizaciones. **Hecha.**
 2. Rol de juegos: generación automática por categoría, descansos, control de empalmes, edición,
-   reprogramación y partidos pospuestos. **Hecha.** La opción de default con equipo que paga se
-   completa en las etapas 3 y 4; la hoja del rol en PDF e imagen, en la etapa 6.
-3. Resultados y estadísticas.
+   reprogramación y partidos pospuestos. **Hecha.** La hoja del rol en PDF e imagen llega en la
+   etapa 6.
+3. Resultados y estadísticas: marcadores, goleadores, default con equipo que paga, clasificación
+   y portería menos goleada por equipo. **Hecha.** El cobro de lo que indica el default llega en
+   la etapa 4.
 4. Cobros.
 5. Liguilla.
 6. Reportes.

@@ -37,6 +37,12 @@ QLabel#titulo {{
     border-radius: 6px;
 }}
 QLabel#tituloAcceso {{ color: {VERDE_ACTIVO}; font-size: 24px; font-weight: 600; }}
+QFrame#tarjeta {{ background: {BLANCO}; border: 1px solid {BORDE}; border-radius: 8px; }}
+QLabel#tarjetaNumero {{ color: {TEXTO}; font-size: 30px; font-weight: 600; }}
+QLabel#tarjetaTexto {{ color: {TEXTO_SUAVE}; }}
+QSpinBox#marcador {{ font-size: 24px; font-weight: 600; }}
+QWidget#listaGoles {{ background: {BLANCO}; }}
+QRadioButton {{ color: {TEXTO}; }}
 QLabel#seccion {{ font-size: 14px; font-weight: 600; color: {TEXTO}; }}
 QLabel#ayuda {{ color: {TEXTO_SUAVE}; }}
 QLabel#aviso {{ color: {ROJO}; font-weight: 600; }}

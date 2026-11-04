@@ -63,6 +63,26 @@ CREATE TABLE IF NOT EXISTS partidos (
     CHECK (local_id <> visitante_id)
 );
 CREATE INDEX IF NOT EXISTS partidos_fecha ON partidos (fecha);
+CREATE TABLE IF NOT EXISTS resultados (
+    partido_id INTEGER PRIMARY KEY REFERENCES partidos(id) ON DELETE CASCADE,
+    goles_local INTEGER NOT NULL CHECK (goles_local >= 0),
+    goles_visitante INTEGER NOT NULL CHECK (goles_visitante >= 0),
+    ausente_id INTEGER REFERENCES equipos(id) ON DELETE RESTRICT,
+    paga TEXT
+);
+CREATE TABLE IF NOT EXISTS goles (
+    partido_id INTEGER NOT NULL REFERENCES partidos(id) ON DELETE CASCADE,
+    jugador_id INTEGER NOT NULL REFERENCES jugadores(id) ON DELETE RESTRICT,
+    cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+    PRIMARY KEY (partido_id, jugador_id)
+);
+CREATE TABLE IF NOT EXISTS reglas_torneo (
+    torneo_id INTEGER PRIMARY KEY REFERENCES torneos(id) ON DELETE CASCADE,
+    victoria INTEGER NOT NULL,
+    empate INTEGER NOT NULL,
+    derrota INTEGER NOT NULL,
+    default_goles INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS usuarios (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     usuario TEXT NOT NULL,

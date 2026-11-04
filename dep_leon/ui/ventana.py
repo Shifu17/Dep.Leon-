@@ -26,12 +26,15 @@ from .acceso import pedir_acceso
 from .comun import error, info
 from .pagina_config import PaginaConfig
 from .pagina_equipos import PaginaEquipos
+from .pagina_estadisticas import PaginaEstadisticas
+from .pagina_inicio import PaginaInicio
 from .pagina_ligas import PaginaLigas
+from .pagina_resultados import PaginaResultados
 from .pagina_rol import PaginaRol
 
 ANCHO_BARRA = 220
 MINUTOS_ENTRE_REVISIONES = 30
-ETAPAS_PENDIENTES = ["Estadísticas", "Cobros", "Liguilla", "Reportes"]
+ETAPAS_PENDIENTES = ["Cobros", "Liguilla", "Reportes"]
 
 
 class _Senales(QObject):
@@ -53,9 +56,12 @@ class Ventana(QMainWindow):
         self._progreso: QProgressDialog | None = None
 
         self.pila = QStackedWidget()
+        self.inicio = PaginaInicio(conn)
         self.ligas = PaginaLigas(conn)
         self.equipos = PaginaEquipos(conn)
         self.rol = PaginaRol(conn)
+        self.resultados = PaginaResultados(conn)
+        self.estadisticas = PaginaEstadisticas(conn)
         self.config = PaginaConfig(conn)
         self.ligas.datos_cambiados.connect(self.equipos.refrescar)
         self.ligas.datos_cambiados.connect(self.rol.refrescar)
@@ -115,9 +121,12 @@ class Ventana(QMainWindow):
             columna.addWidget(nav)
             return nav
 
+        agregar("Inicio", self.inicio).click()
         agregar("Ligas y categorías", self.ligas)
-        agregar("Equipos y jugadores", self.equipos).click()
+        agregar("Equipos y jugadores", self.equipos)
         agregar("Rol de juegos", self.rol)
+        agregar("Resultados", self.resultados)
+        agregar("Estadísticas", self.estadisticas)
         for texto in ETAPAS_PENDIENTES:
             pendiente = QPushButton(texto, objectName="nav", enabled=False)
             pendiente.setToolTip("Disponible en una próxima etapa")

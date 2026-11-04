@@ -464,6 +464,9 @@ class PaginaEquipos(QWidget):
         if jugador_id is None:
             error(self, "Primero selecciona un jugador.")
             return
+        if self.conn.execute("SELECT 1 FROM goles WHERE jugador_id = ?", (jugador_id,)).fetchone():
+            error(self, "No se puede eliminar: el jugador tiene goles registrados en un partido.")
+            return
         if not confirmar(self, "¿Eliminar este jugador?"):
             return
         foto = self.conn.execute("SELECT foto FROM jugadores WHERE id = ?", (jugador_id,)).fetchone()

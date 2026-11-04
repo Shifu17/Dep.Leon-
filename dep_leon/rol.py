@@ -20,6 +20,8 @@ SEMANAS_MAXIMAS = 156
 
 PROGRAMADO = "Programado"
 POSPUESTO = "Pospuesto"
+JUGADO = "Jugado"
+DEFAULT = "Default"
 
 DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 MESES = [
@@ -245,6 +247,19 @@ def generar(
     Devuelve (partidos creados, avisos). Lanza ValueError si no se puede generar.
     """
     azar = azar or random.Random()
+    marcas = ",".join("?" * len(categoria_ids))
+    con_resultados = conn.execute(
+        f"""SELECT DISTINCT c.nombre FROM resultados r JOIN partidos p ON p.id = r.partido_id
+            JOIN categorias c ON c.id = p.categoria_id
+            WHERE p.torneo_id = ? AND p.categoria_id IN ({marcas}) ORDER BY c.nombre""",
+        (torneo_id, *categoria_ids),
+    ).fetchall()
+    if con_resultados:
+        nombres = ", ".join(f["nombre"] for f in con_resultados)
+        raise ValueError(
+            f"No se puede generar de nuevo el rol de {nombres}: ya tiene resultados capturados. "
+            "Agrega o edita los partidos a mano."
+        )
     jornadas: dict[int, list] = {}
     avisos: list[str] = []
     for categoria_id in categoria_ids:
@@ -358,6 +373,8 @@ def descansos(
 
 def posponer(conn: sqlite3.Connection, partido_id: int) -> None:
     """Deja el partido pendiente de reprogramar y libera su cancha."""
+    if conn.execute("SELECT 1 FROM resultados WHERE partido_id = ?", (partido_id,)).fetchone():
+        raise ValueError("Este partido ya tiene resultado. Bórralo antes de posponerlo.")
     with conn:
         conn.execute(
             "UPDATE partidos SET estado = ?, fecha = NULL, hora = NULL, cancha = NULL WHERE id = ?",
