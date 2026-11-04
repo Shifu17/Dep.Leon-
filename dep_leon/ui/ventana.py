@@ -9,7 +9,6 @@ from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -23,13 +22,14 @@ from PySide6.QtWidgets import (
 
 from .. import __version__, db, updater
 from ..paths import asset, data_dir, fotos_dir
+from .acceso import pedir_acceso
 from .comun import error, info
 from .pagina_config import PaginaConfig
 from .pagina_equipos import PaginaEquipos
 from .pagina_ligas import PaginaLigas
 from .pagina_rol import PaginaRol
 
-ALTO_BANNER = 84
+ANCHO_BARRA = 220
 MINUTOS_ENTRE_REVISIONES = 30
 ETAPAS_PENDIENTES = ["Estadísticas", "Cobros", "Liguilla", "Reportes"]
 
@@ -64,15 +64,17 @@ class Ventana(QMainWindow):
         self.config.datos_cambiados.connect(self.equipos.refrescar)
         self.config.datos_cambiados.connect(self.rol.refrescar)
         self.config.buscar_actualizacion.connect(lambda: self.revisar_actualizacion(manual=True))
+        self.config.cerrar_sesion.connect(self.cerrar_sesion)
 
         contenido = QWidget(objectName="contenido")
-        raiz = QVBoxLayout(contenido)
-        raiz.setContentsMargins(8, 8, 8, 8)
-        raiz.addWidget(self._crear_banner())
-        cuerpo = QHBoxLayout()
+        cuerpo = QHBoxLayout(contenido)
+        cuerpo.setContentsMargins(0, 0, 0, 0)
+        cuerpo.setSpacing(0)
         cuerpo.addWidget(self._crear_barra())
-        cuerpo.addWidget(self.pila, 1)
-        raiz.addLayout(cuerpo, 1)
+        margen = QVBoxLayout()
+        margen.setContentsMargins(12, 10, 12, 10)
+        margen.addWidget(self.pila)
+        cuerpo.addLayout(margen, 1)
         self.setCentralWidget(contenido)
 
         self.senales = _Senales()
@@ -88,27 +90,22 @@ class Ventana(QMainWindow):
         self.temporizador.start()
         QTimer.singleShot(1500, self.revisar_actualizacion)
 
-    def _crear_banner(self) -> QFrame:
-        banner = QFrame(objectName="banner")
-        banner.setFixedHeight(ALTO_BANNER + 12)
-        fila = QHBoxLayout(banner)
-        fila.setContentsMargins(4, 4, 4, 4)
-        for nombre in ("logo_futbol7.png", "banner_deportivo_leon.png", "jugadores.png"):
-            imagen = QPixmap(str(asset(nombre))).scaledToHeight(
-                ALTO_BANNER, Qt.TransformationMode.SmoothTransformation
-            )
-            fila.addWidget(QLabel(pixmap=imagen))
-            if nombre != "jugadores.png":
-                fila.addStretch(1)
-        return banner
-
     def _crear_barra(self) -> QWidget:
         barra = QWidget(objectName="barra")
-        barra.setFixedWidth(210)
+        barra.setFixedWidth(ANCHO_BARRA)
         columna = QVBoxLayout(barra)
-        columna.setContentsMargins(0, 6, 0, 6)
+        columna.setContentsMargins(0, 14, 0, 8)
         columna.setSpacing(0)
         grupo = QButtonGroup(self, exclusive=True)
+
+        logo = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
+        logo.setPixmap(
+            QPixmap(str(asset("logo.png"))).scaledToWidth(
+                ANCHO_BARRA - 28, Qt.TransformationMode.SmoothTransformation
+            )
+        )
+        columna.addWidget(logo)
+        columna.addSpacing(14)
 
         def agregar(texto: str, pagina: QWidget):
             self.pila.addWidget(pagina)
@@ -128,6 +125,19 @@ class Ventana(QMainWindow):
         columna.addStretch(1)
         agregar("Configuración", self.config)
         return barra
+
+    def cerrar_sesion(self):
+        """Oculta todo hasta volver a iniciar sesión; si se cancela, cierra el programa."""
+        app = QApplication.instance()
+        app.setQuitOnLastWindowClosed(False)
+        self.temporizador.stop()
+        self.hide()
+        if pedir_acceso(self.conn):
+            self.show()
+            self.temporizador.start()
+            app.setQuitOnLastWindowClosed(True)
+        else:
+            app.quit()
 
     def revisar_actualizacion(self, manual: bool = False):
         def trabajo():
@@ -152,7 +162,8 @@ class Ventana(QMainWindow):
             info(self, f"Ya tienes la versión más reciente ({__version__}).")
 
     def _al_encontrar(self, actualizacion: updater.Actualizacion, manual: bool):
-        if self._avisada == actualizacion.version and not manual:
+        # Con la sesión cerrada no se muestra nada; se avisará en la siguiente revisión.
+        if not self.isVisible() or (self._avisada == actualizacion.version and not manual):
             return
         self._avisada = actualizacion.version
         caja = QMessageBox(self)

@@ -9,12 +9,14 @@ from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QWi
 
 from .. import __version__, db
 from ..paths import fotos_dir
+from .acceso import DialogoCambiarContrasena
 from .comun import boton, confirmar, error, info
 
 
 class PaginaConfig(QWidget):
     datos_cambiados = Signal()
     buscar_actualizacion = Signal()
+    cerrar_sesion = Signal()
 
     def __init__(self, conn: sqlite3.Connection):
         super().__init__()
@@ -24,11 +26,20 @@ class PaginaConfig(QWidget):
         raiz = QVBoxLayout(self)
         raiz.addWidget(QLabel("Configuración", objectName="titulo"))
 
+        raiz.addWidget(QLabel("Cuenta", objectName="seccion"))
+        fila = QHBoxLayout()
+        fila.addWidget(boton("Cambiar contraseña", self.cambiar_contrasena, "secundario"))
+        fila.addWidget(boton("Cerrar sesión", self.cerrar_sesion.emit, "secundario"))
+        fila.addStretch(1)
+        raiz.addLayout(fila)
+        raiz.addSpacing(18)
+
         raiz.addWidget(QLabel("Respaldo de la información", objectName="seccion"))
         raiz.addWidget(
             QLabel(
                 "El respaldo guarda en un archivo todas las ligas, los equipos, los jugadores y sus "
-                "fotos. Guárdalo también fuera de esta computadora, como en una USB.",
+                "fotos. Guárdalo también fuera de esta computadora, como en una USB, y cuídalo: "
+                "el archivo no lleva contraseña. Al restaurar, tu cuenta actual se conserva.",
                 objectName="ayuda", wordWrap=True,
             )
         )
@@ -53,6 +64,9 @@ class PaginaConfig(QWidget):
         fila.addStretch(1)
         raiz.addLayout(fila)
         raiz.addStretch(1)
+
+    def cambiar_contrasena(self):
+        DialogoCambiarContrasena(self, self.conn).exec()
 
     def crear_respaldo(self):
         nombre = f"Respaldo Deportivo Leon {datetime.now():%Y-%m-%d %H%M}.zip"

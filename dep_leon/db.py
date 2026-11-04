@@ -63,6 +63,12 @@ CREATE TABLE IF NOT EXISTS partidos (
     CHECK (local_id <> visitante_id)
 );
 CREATE INDEX IF NOT EXISTS partidos_fecha ON partidos (fecha);
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    usuario TEXT NOT NULL,
+    contrasena TEXT NOT NULL,
+    codigo TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS config_rol (
     torneo_id INTEGER PRIMARY KEY REFERENCES torneos(id) ON DELETE CASCADE,
     datos TEXT NOT NULL
@@ -140,9 +146,17 @@ def restaurar(conn: sqlite3.Connection, origen: Path | str, fotos_dir: Path) -> 
                 }
                 if not {"ligas", "categorias", "torneos", "equipos", "jugadores"} <= tablas:
                     raise ValueError(error)
+                # La cuenta es de esta computadora: un respaldo no debe cambiar quién entra.
+                cuenta = conn.execute("SELECT * FROM usuarios").fetchall()
                 fuente.backup(conn)
                 # Un respaldo de una versión anterior puede no traer las tablas nuevas.
                 conn.executescript(ESQUEMA)
+                with conn:
+                    conn.execute("DELETE FROM usuarios")
+                    conn.executemany(
+                        "INSERT INTO usuarios (id, usuario, contrasena, codigo) VALUES (?, ?, ?, ?)",
+                        [tuple(c) for c in cuenta],
+                    )
             finally:
                 fuente.close()
             for nombre in archivo.namelist():

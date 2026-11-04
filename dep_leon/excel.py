@@ -27,10 +27,10 @@ FILAS_CON_AYUDA = 1000
 MAX_FILAS = 5000
 EXTENSIONES_FOTO = (".jpg", ".jpeg", ".png")
 
-VERDE = PatternFill("solid", fgColor="00C800")
-AMBAR = PatternFill("solid", fgColor="FFC000")
-LAVANDA = PatternFill("solid", fgColor="D0D8E8")
-BORDE = Border(*[Side(style="thin", color="1F3864")] * 4)
+VERDE = PatternFill("solid", fgColor="1E7F4C")
+AMBAR = PatternFill("solid", fgColor="E4EDE8")
+LAVANDA = PatternFill("solid", fgColor="F4F7F5")
+BORDE = Border(*[Side(style="thin", color="CBD8D0")] * 4)
 AJUSTE = Alignment(wrap_text=True, vertical="top")
 
 

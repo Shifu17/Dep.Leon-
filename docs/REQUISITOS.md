@@ -1,7 +1,7 @@
 # Deportivo León: requisitos
 
 Programa de escritorio para Windows, en Python y en español, para administrarlo en una sola
-computadora, sin inicio de sesión.
+computadora, con una cuenta de acceso y código de recuperación.
 
 ## Estructura de la liga
 
@@ -43,12 +43,13 @@ Al marcar que un equipo no se presentó, quien captura elige una de estas opcion
 
 ## Reportes
 
-PDF para imprimir, imagen para WhatsApp y recibos de pago. El rol de juegos usa el diseño de la
-hoja actual de la liga: encabezado verde, y columnas Hora, Equipo, Equipo, Categoría y Cancha.
+PDF para imprimir, imagen para WhatsApp y recibos de pago. El rol de juegos usa las columnas de la
+hoja actual de la liga: Hora, Equipo, Equipo, Categoría y Cancha.
 
 ## Fuera de alcance
 
-Tarjetas, sanciones, asistencia, exportación a Excel de tablas, varias computadoras y contraseñas.
+Tarjetas, sanciones, asistencia, exportación a Excel de tablas, varias computadoras y varios
+usuarios.
 
 ## Etapas
 

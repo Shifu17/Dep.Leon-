@@ -70,7 +70,7 @@ class DialogoJugador(QDialog):
         self.posicion.addItems([""] + POSICIONES)
         self.vista_foto = QLabel("Sin foto", alignment=Qt.AlignmentFlag.AlignCenter)
         self.vista_foto.setFixedSize(110, 130)
-        self.vista_foto.setStyleSheet("background: white; border: 1px solid #1F3864;")
+        self.vista_foto.setStyleSheet("background: white; border: 1px solid #CBD8D0;")
         if jugador:
             self.fecha.setDate(QDate.fromString(jugador["fecha_nacimiento"], "yyyy-MM-dd"))
             self.numero.setValue(jugador["numero"])

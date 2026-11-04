@@ -18,10 +18,10 @@ COLUMNAS = 2
 FILAS = 4
 SEPARACION = 4 * mm
 
-AMBAR = HexColor("#FFC000")
-VERDE = HexColor("#00C800")
-LAVANDA = HexColor("#E9EDF4")
-AZUL = HexColor("#1F5FA8")
+DORADO = HexColor("#C9A24B")
+VERDE = HexColor("#1E7F4C")
+FONDO = HexColor("#F4F7F5")
+OSCURO = HexColor("#10291D")
 
 
 def generar(conn: sqlite3.Connection, equipo_id: int, destino: Path | str, fotos_dir: Path) -> int:
@@ -56,27 +56,28 @@ def generar(conn: sqlite3.Connection, equipo_id: int, destino: Path | str, fotos
 
 
 def _dibujar(pdf: canvas.Canvas, x: float, y: float, jugador, equipo, fotos_dir: Path) -> None:
-    pdf.setFillColor(AMBAR)
-    pdf.setStrokeColor(black)
+    pdf.setFillColor(DORADO)
+    pdf.setStrokeColor(OSCURO)
     pdf.rect(x, y, ANCHO, ALTO, fill=1)
-    margen = 1.5 * mm
-    pdf.setFillColor(LAVANDA)
+    margen = 1 * mm
+    pdf.setFillColor(FONDO)
     pdf.rect(x + margen, y + margen, ANCHO - 2 * margen, ALTO - 2 * margen, fill=1, stroke=0)
 
-    alto_encabezado = 13 * mm
+    alto_encabezado = 14 * mm
     tope = y + ALTO - margen
-    pdf.setFillColor(black)
+    pdf.setFillColor(OSCURO)
     pdf.rect(x + margen, tope - alto_encabezado, ANCHO - 2 * margen, alto_encabezado, fill=1, stroke=0)
     pdf.drawImage(
-        ImageReader(str(asset("logo_futbol7.png"))),
-        x + margen + 0.5 * mm, tope - alto_encabezado + 0.5 * mm,
-        12 * mm, alto_encabezado - 1 * mm, preserveAspectRatio=True,
+        ImageReader(str(asset("logo.png"))),
+        x + margen + 1 * mm, tope - alto_encabezado + 0.5 * mm,
+        16 * mm, alto_encabezado - 1 * mm, preserveAspectRatio=True, mask="auto",
     )
-    pdf.drawImage(
-        ImageReader(str(asset("banner_deportivo_leon.png"))),
-        x + margen + 13 * mm, tope - alto_encabezado + 0.5 * mm,
-        ANCHO - 2 * margen - 14 * mm, alto_encabezado - 1 * mm, preserveAspectRatio=True,
-    )
+    centro_texto = x + margen + 18 * mm + (ANCHO - 2 * margen - 18 * mm) / 2
+    pdf.setFillColor(white)
+    pdf.setFont("Helvetica-Bold", 13)
+    pdf.drawCentredString(centro_texto, tope - 6.5 * mm, "DEPORTIVO LEÓN")
+    pdf.setFont("Helvetica", 8)
+    pdf.drawCentredString(centro_texto, tope - 10.5 * mm, "Saltillo A.C.")
 
     alto_franja = 5 * mm
     pdf.setFillColor(VERDE)
@@ -107,7 +108,7 @@ def _dibujar(pdf: canvas.Canvas, x: float, y: float, jugador, equipo, fotos_dir:
     texto_x = foto_x + foto_ancho + 2 * mm
     texto_ancho = x + ANCHO - margen - 1.5 * mm - texto_x
     linea = foto_y + foto_alto - 4 * mm
-    pdf.setFillColor(AZUL)
+    pdf.setFillColor(VERDE)
     pdf.setFont("Helvetica-Bold", 10)
     pdf.drawString(texto_x, linea, _ajustar(pdf, jugador["nombre"], "Helvetica-Bold", 10, texto_ancho))
     linea -= 5.5 * mm
