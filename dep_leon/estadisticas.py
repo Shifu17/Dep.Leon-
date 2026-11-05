@@ -4,7 +4,7 @@ import sqlite3
 from dataclasses import dataclass
 from itertools import groupby
 
-from .resultados import obtener_reglas
+from .reglas import obtener_reglas
 
 
 @dataclass
@@ -28,7 +28,8 @@ def _resultados(conn: sqlite3.Connection, torneo_id: int, categoria_id: int) -> 
     return conn.execute(
         """SELECT p.local_id, p.visitante_id, r.goles_local, r.goles_visitante
            FROM resultados r JOIN partidos p ON p.id = r.partido_id
-           WHERE p.torneo_id = ? AND p.categoria_id = ?""",
+           WHERE p.torneo_id = ? AND p.categoria_id = ?
+             AND p.id NOT IN (SELECT partido_id FROM llaves WHERE partido_id IS NOT NULL)""",
         (torneo_id, categoria_id),
     ).fetchall()
 

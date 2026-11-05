@@ -22,6 +22,11 @@ PROGRAMADO = "Programado"
 POSPUESTO = "Pospuesto"
 JUGADO = "Jugado"
 DEFAULT = "Default"
+POR_PROGRAMAR = "Por programar"
+
+# Los partidos de liguilla usan un número de jornada aparte: 101 es la final, 102 la semifinal...
+BASE_LIGUILLA = 100
+RONDAS = ["Final", "Semifinal", "Cuartos de final", "Octavos de final", "Dieciseisavos de final"]
 
 DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 MESES = [
@@ -32,6 +37,17 @@ MESES = [
 
 def fecha_larga(fecha: date) -> str:
     return f"{DIAS[fecha.weekday()]} {fecha.day} de {MESES[fecha.month - 1]} del {fecha.year}"
+
+
+def nombre_ronda(restantes: int) -> str:
+    """Nombre de una ronda según cuántas faltan contando esa: 1 es la final."""
+    return RONDAS[restantes - 1] if restantes <= len(RONDAS) else f"Ronda de {2 ** restantes}"
+
+
+def nombre_jornada(jornada: int) -> str:
+    if jornada > BASE_LIGUILLA:
+        return nombre_ronda(jornada - BASE_LIGUILLA)
+    return f"Jornada {jornada}"
 
 
 def nombre_cancha(cancha: str | None) -> str:
@@ -260,6 +276,14 @@ def generar(
             f"No se puede generar de nuevo el rol de {nombres}: ya tiene resultados capturados. "
             "Agrega o edita los partidos a mano."
         )
+    con_liguilla = conn.execute(
+        f"""SELECT c.nombre FROM liguillas g JOIN categorias c ON c.id = g.categoria_id
+            WHERE g.torneo_id = ? AND g.categoria_id IN ({marcas}) ORDER BY c.nombre""",
+        (torneo_id, *categoria_ids),
+    ).fetchall()
+    if con_liguilla:
+        nombres = ", ".join(f["nombre"] for f in con_liguilla)
+        raise ValueError(f"No se puede generar de nuevo el rol de {nombres}: ya tiene liguilla.")
     jornadas: dict[int, list] = {}
     avisos: list[str] = []
     for categoria_id in categoria_ids:
@@ -345,7 +369,8 @@ def descansos(
     """Equipos que descansan en las jornadas jugadas en esa fecha: (categoría, equipo)."""
     jornadas = conn.execute(
         "SELECT DISTINCT categoria_id, jornada FROM partidos "
-        "WHERE torneo_id = ? AND fecha = ? AND (? IS NULL OR categoria_id = ?)",
+        "WHERE torneo_id = ? AND fecha = ? AND (? IS NULL OR categoria_id = ?) "
+        "AND id NOT IN (SELECT partido_id FROM llaves WHERE partido_id IS NOT NULL)",
         (torneo_id, fecha, categoria_id, categoria_id),
     ).fetchall()
     resultado = []

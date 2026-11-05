@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import credenciales, excel
+from .. import cobros, credenciales, excel
 from ..jugadores import NUMERO_MAX, POSICIONES, borrar_foto, error_de_edad, guardar_foto
 from ..paths import fotos_dir
 from .comun import boton, botones_dialogo, confirmar, error, id_seleccionado, info, llenar, tabla
@@ -377,6 +377,9 @@ class PaginaEquipos(QWidget):
                 "Elimina esos partidos o genera de nuevo el rol sin él.",
             )
             return
+        if cobros.tiene_pagos(self.conn, equipo_id):
+            error(self, "No se puede eliminar: el equipo tiene pagos registrados.")
+            return
         if not confirmar(self, "¿Eliminar este equipo y todos sus jugadores?"):
             return
         fotos = self.conn.execute(
@@ -391,8 +394,9 @@ class PaginaEquipos(QWidget):
     def _tiene_partidos(self, equipo_id) -> bool:
         return (
             self.conn.execute(
-                "SELECT 1 FROM partidos WHERE local_id = ? OR visitante_id = ? LIMIT 1",
-                (equipo_id, equipo_id),
+                "SELECT 1 FROM partidos WHERE local_id = ? OR visitante_id = ? "
+                "UNION ALL SELECT 1 FROM llaves WHERE equipo_a_id = ? OR equipo_b_id = ? LIMIT 1",
+                (equipo_id, equipo_id, equipo_id, equipo_id),
             ).fetchone()
             is not None
         )

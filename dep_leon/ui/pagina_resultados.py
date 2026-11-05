@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import resultados, rol
+from .. import liguilla, resultados, rol
 from .comun import boton, botones_dialogo, confirmar, error, id_seleccionado, llenar, tabla
 from .filtros import FiltrosLiga
 
@@ -63,6 +63,25 @@ class DialogoResultado(QDialog):
 
         raiz = QVBoxLayout(self)
         raiz.addLayout(columnas, 1)
+
+        # Solo en liguilla decidida por penales: un empate necesita saber quién avanza.
+        llave = liguilla.llave_de_partido(conn, partido["id"])
+        self.pide_penales = bool(llave and llave["desempate"] == liguilla.PENALES)
+        self.penales_local = QSpinBox(minimum=0, maximum=GOLES_MAXIMOS)
+        self.penales_visitante = QSpinBox(minimum=0, maximum=GOLES_MAXIMOS)
+        if self.pide_penales:
+            if llave["penales_local"] is not None:
+                self.penales_local.setValue(llave["penales_local"])
+                self.penales_visitante.setValue(llave["penales_visitante"])
+            fila = QHBoxLayout()
+            fila.addWidget(QLabel("Penales, solo si empatan:"))
+            fila.addWidget(QLabel(local))
+            fila.addWidget(self.penales_local)
+            fila.addWidget(QLabel(visitante))
+            fila.addWidget(self.penales_visitante)
+            fila.addStretch(1)
+            raiz.addLayout(fila)
+
         raiz.addWidget(
             QLabel(
                 "Los goleadores son opcionales. Puedes dejar goles sin jugador (como un autogol), "
@@ -109,6 +128,9 @@ class DialogoResultado(QDialog):
             resultados.guardar_resultado(
                 self.conn, self.partido["id"], self.marcador_local.value(),
                 self.marcador_visitante.value(), self.goleadores(),
+                (self.penales_local.value(), self.penales_visitante.value())
+                if self.pide_penales
+                else None,
             )
         except ValueError as exc:
             error(self, str(exc))
@@ -148,6 +170,65 @@ class DialogoNoSePresento(QDialog):
         forma.addRow(botones_dialogo(self, self.accept))
 
 
+def _partido_completo(conn: sqlite3.Connection, partido_id: int) -> sqlite3.Row:
+    return conn.execute(
+        """SELECT p.*, l.nombre AS local, v.nombre AS visitante
+           FROM partidos p JOIN equipos l ON l.id = p.local_id
+           JOIN equipos v ON v.id = p.visitante_id WHERE p.id = ?""",
+        (partido_id,),
+    ).fetchone()
+
+
+def capturar_partido(padre: QWidget, conn: sqlite3.Connection, partido_id: int) -> bool:
+    partido = _partido_completo(conn, partido_id)
+    if partido["fecha"] is None:
+        error(padre, "Este partido no tiene fecha. Primero prográmalo.")
+        return False
+    return bool(DialogoResultado(padre, conn, partido, partido["local"], partido["visitante"]).exec())
+
+
+def marcar_no_presentado(padre: QWidget, conn: sqlite3.Connection, partido_id: int) -> bool:
+    partido = _partido_completo(conn, partido_id)
+    if partido["fecha"] is None:
+        error(padre, "Este partido no tiene fecha. No se puede marcar todavía.")
+        return False
+    if partido["estado"] in (rol.JUGADO, rol.DEFAULT):
+        error(padre, "Este partido ya tiene resultado. Bórralo antes de marcar que no se presentó.")
+        return False
+    reglas = resultados.obtener_reglas(conn, partido["torneo_id"])
+    dialogo = DialogoNoSePresento(
+        padre, partido, partido["local"], partido["visitante"], reglas.default_goles
+    )
+    if not dialogo.exec():
+        return False
+    try:
+        if dialogo.posponer.isChecked():
+            rol.posponer(conn, partido["id"])
+        else:
+            resultados.dar_default(
+                conn, partido["id"], dialogo.ausente.currentData(), dialogo.paga.currentData()
+            )
+    except ValueError as exc:
+        error(padre, str(exc))
+        return False
+    return True
+
+
+def borrar_resultado(padre: QWidget, conn: sqlite3.Connection, partido_id: int) -> bool:
+    partido = _partido_completo(conn, partido_id)
+    if partido["estado"] not in (rol.JUGADO, rol.DEFAULT):
+        error(padre, "Este partido no tiene resultado.")
+        return False
+    if not confirmar(padre, "¿Borrar el marcador y los goles de este partido?"):
+        return False
+    try:
+        resultados.borrar_resultado(conn, partido["id"])
+    except ValueError as exc:
+        error(padre, str(exc))
+        return False
+    return True
+
+
 class PaginaResultados(QWidget):
     def __init__(self, conn: sqlite3.Connection):
         super().__init__()
@@ -171,7 +252,7 @@ class PaginaResultados(QWidget):
         acciones.addStretch(1)
 
         self.tabla = tabla(
-            ["Fecha", "Hora", "Equipo", "Marcador", "Equipo", "Categoría", "Jornada", "Estado"], estirar=2
+            ["Fecha", "Hora", "Equipo", "Marcador", "Equipo", "Categoría", "Ronda", "Estado"], estirar=2
         )
         self.tabla.horizontalHeader().setSectionResizeMode(
             4, self.tabla.horizontalHeader().ResizeMode.Stretch
@@ -219,7 +300,7 @@ class PaginaResultados(QWidget):
                         date.fromisoformat(p["fecha"]).strftime("%d/%m/%Y") if p["fecha"] else "Por definir",
                         p["hora"] or "Por definir", p["local"],
                         f"{p['goles_local']} - {p['goles_visitante']}" if p["goles_local"] is not None else "-",
-                        p["visitante"], p["categoria"], p["jornada"], p["estado"],
+                        p["visitante"], p["categoria"], rol.nombre_jornada(p["jornada"]), p["estado"],
                     ],
                 )
                 for p in filas
@@ -230,63 +311,23 @@ class PaginaResultados(QWidget):
         )
         self.vacio.setVisible(not filas)
 
-    def _partido(self):
+    def _partido(self) -> int | None:
         partido_id = id_seleccionado(self.tabla)
         if partido_id is None:
             error(self, "Primero selecciona un partido.")
-            return None
-        return self.conn.execute(
-            """SELECT p.*, l.nombre AS local, v.nombre AS visitante
-               FROM partidos p JOIN equipos l ON l.id = p.local_id
-               JOIN equipos v ON v.id = p.visitante_id WHERE p.id = ?""",
-            (partido_id,),
-        ).fetchone()
+        return partido_id
 
     def capturar(self):
         partido = self._partido()
-        if partido is None:
-            return
-        if partido["estado"] == rol.POSPUESTO:
-            error(self, "Este partido está pospuesto. Primero dale fecha en «Rol de juegos».")
-            return
-        if DialogoResultado(self, self.conn, partido, partido["local"], partido["visitante"]).exec():
+        if partido is not None and capturar_partido(self, self.conn, partido):
             self.refrescar_partidos()
 
     def no_se_presento(self):
         partido = self._partido()
-        if partido is None:
-            return
-        if partido["estado"] == rol.POSPUESTO:
-            error(self, "Este partido ya está pospuesto.")
-            return
-        if partido["estado"] in (rol.JUGADO, rol.DEFAULT):
-            error(self, "Este partido ya tiene resultado. Bórralo antes de marcar que no se presentó.")
-            return
-        reglas = resultados.obtener_reglas(self.conn, partido["torneo_id"])
-        dialogo = DialogoNoSePresento(
-            self, partido, partido["local"], partido["visitante"], reglas.default_goles
-        )
-        if not dialogo.exec():
-            return
-        try:
-            if dialogo.posponer.isChecked():
-                rol.posponer(self.conn, partido["id"])
-            else:
-                resultados.dar_default(
-                    self.conn, partido["id"], dialogo.ausente.currentData(), dialogo.paga.currentData()
-                )
-        except ValueError as exc:
-            error(self, str(exc))
-            return
-        self.refrescar_partidos()
+        if partido is not None and marcar_no_presentado(self, self.conn, partido):
+            self.refrescar_partidos()
 
     def borrar(self):
         partido = self._partido()
-        if partido is None:
-            return
-        if partido["estado"] not in (rol.JUGADO, rol.DEFAULT):
-            error(self, "Este partido no tiene resultado.")
-            return
-        if confirmar(self, "¿Borrar el marcador y los goles de este partido?"):
-            resultados.borrar_resultado(self.conn, partido["id"])
+        if partido is not None and borrar_resultado(self, self.conn, partido):
             self.refrescar_partidos()

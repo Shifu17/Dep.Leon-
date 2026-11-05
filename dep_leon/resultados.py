@@ -1,41 +1,12 @@
 """Captura de resultados, goleadores y partidos por default."""
 
 import sqlite3
-from dataclasses import dataclass
 
-from . import rol
+from . import cobros, liguilla, rol
+from .cobros import PAGA_AMBOS, PAGA_AUSENTE, PAGA_NINGUNO, PAGA_PRESENTE
+from .reglas import Reglas, guardar_reglas, obtener_reglas  # noqa: F401
 
-# Quién paga el arbitraje cuando un equipo no se presenta (lo usará la etapa de cobros).
-PAGA_AUSENTE = "ausente"
-PAGA_PRESENTE = "presente"
-PAGA_AMBOS = "ambos"
-PAGA_NINGUNO = "ninguno"
 OPCIONES_PAGA = (PAGA_AUSENTE, PAGA_PRESENTE, PAGA_AMBOS, PAGA_NINGUNO)
-
-
-@dataclass(frozen=True)
-class Reglas:
-    victoria: int = 3
-    empate: int = 1
-    derrota: int = 0
-    default_goles: int = 3
-
-
-def obtener_reglas(conn: sqlite3.Connection, torneo_id: int) -> Reglas:
-    fila = conn.execute(
-        "SELECT victoria, empate, derrota, default_goles FROM reglas_torneo WHERE torneo_id = ?",
-        (torneo_id,),
-    ).fetchone()
-    return Reglas(*fila) if fila else Reglas()
-
-
-def guardar_reglas(conn: sqlite3.Connection, torneo_id: int, reglas: Reglas) -> None:
-    with conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO reglas_torneo "
-            "(torneo_id, victoria, empate, derrota, default_goles) VALUES (?, ?, ?, ?, ?)",
-            (torneo_id, reglas.victoria, reglas.empate, reglas.derrota, reglas.default_goles),
-        )
 
 
 def _partido_con_fecha(conn: sqlite3.Connection, partido_id: int) -> sqlite3.Row:
@@ -44,6 +15,8 @@ def _partido_con_fecha(conn: sqlite3.Connection, partido_id: int) -> sqlite3.Row
         raise ValueError("El partido ya no existe.")
     if partido["estado"] == rol.POSPUESTO:
         raise ValueError("Este partido está pospuesto. Primero dale fecha en «Rol de juegos».")
+    if partido["estado"] == rol.POR_PROGRAMAR:
+        raise ValueError("Este partido todavía no tiene fecha. Primero prográmalo.")
     return partido
 
 
@@ -53,6 +26,7 @@ def guardar_resultado(
     goles_local: int,
     goles_visitante: int,
     goleadores: dict[int, int] | None = None,
+    penales: tuple[int, int] | None = None,
 ) -> None:
     """Guarda o corrige el marcador y sus goleadores.
 
@@ -87,6 +61,8 @@ def guardar_resultado(
             [(partido_id, j, n) for j, n in goleadores.items()],
         )
         conn.execute("UPDATE partidos SET estado = ? WHERE id = ?", (rol.JUGADO, partido_id))
+        cobros.sincronizar_partido(conn, partido_id)
+        liguilla.aplicar_resultado(conn, partido_id, penales)
 
 
 def dar_default(conn: sqlite3.Connection, partido_id: int, ausente_id: int, paga: str) -> None:
@@ -106,11 +82,18 @@ def dar_default(conn: sqlite3.Connection, partido_id: int, ausente_id: int, paga
         )
         conn.execute("DELETE FROM goles WHERE partido_id = ?", (partido_id,))
         conn.execute("UPDATE partidos SET estado = ? WHERE id = ?", (rol.DEFAULT, partido_id))
+        cobros.sincronizar_partido(conn, partido_id)
+        liguilla.aplicar_resultado(conn, partido_id)
 
 
 def borrar_resultado(conn: sqlite3.Connection, partido_id: int) -> None:
-    """Quita el resultado y sus goles; el partido vuelve a estar programado."""
+    """Quita el resultado, sus goles y sus cargos; el partido vuelve a estar programado.
+
+    Lanza ValueError si el arbitraje del partido ya tiene pagos.
+    """
     with conn:
+        liguilla.retirar_resultado(conn, partido_id)
         conn.execute("DELETE FROM resultados WHERE partido_id = ?", (partido_id,))
+        cobros.sincronizar_partido(conn, partido_id)
         conn.execute("DELETE FROM goles WHERE partido_id = ?", (partido_id,))
         conn.execute("UPDATE partidos SET estado = ? WHERE id = ?", (rol.PROGRAMADO, partido_id))

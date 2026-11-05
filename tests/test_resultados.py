@@ -281,7 +281,7 @@ def test_flujo_capturar_y_ver_en_estadisticas(ventana, conn, partido_ui, monkeyp
     assert pagina.tabla.rowCount() == 1
     pagina.tabla.selectRow(0)
 
-    fila = pagina._partido()
+    fila = ui_resultados._partido_completo(conn, pagina._partido())
     dialogo = ui_resultados.DialogoResultado(pagina, conn, fila, fila["local"], fila["visitante"])
     dialogo.marcador_local.setValue(2)
     dialogo.marcador_visitante.setValue(1)

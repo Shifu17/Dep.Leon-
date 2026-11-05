@@ -83,6 +83,98 @@ CREATE TABLE IF NOT EXISTS reglas_torneo (
     derrota INTEGER NOT NULL,
     default_goles INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tarifas (
+    torneo_id INTEGER NOT NULL REFERENCES torneos(id) ON DELETE CASCADE,
+    categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+    arbitraje INTEGER NOT NULL CHECK (arbitraje >= 0),
+    inscripcion INTEGER NOT NULL CHECK (inscripcion >= 0),
+    PRIMARY KEY (torneo_id, categoria_id)
+);
+CREATE TABLE IF NOT EXISTS cargos (
+    id INTEGER PRIMARY KEY,
+    torneo_id INTEGER NOT NULL REFERENCES torneos(id) ON DELETE RESTRICT,
+    equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+    partido_id INTEGER REFERENCES partidos(id) ON DELETE RESTRICT,
+    concepto TEXT NOT NULL,
+    monto INTEGER NOT NULL CHECK (monto >= 0),
+    fecha TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS cargo_por_partido ON cargos (partido_id, equipo_id)
+    WHERE partido_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS cargo_inscripcion ON cargos (equipo_id)
+    WHERE partido_id IS NULL;
+CREATE TABLE IF NOT EXISTS pagos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE RESTRICT,
+    fecha TEXT NOT NULL,
+    monto INTEGER NOT NULL CHECK (monto > 0),
+    nota TEXT NOT NULL DEFAULT '',
+    anulado INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS aplicaciones (
+    pago_id INTEGER NOT NULL REFERENCES pagos(id) ON DELETE CASCADE,
+    cargo_id INTEGER NOT NULL REFERENCES cargos(id) ON DELETE RESTRICT,
+    monto INTEGER NOT NULL CHECK (monto > 0),
+    PRIMARY KEY (pago_id, cargo_id)
+);
+CREATE TABLE IF NOT EXISTS tarifas (
+    torneo_id INTEGER NOT NULL REFERENCES torneos(id) ON DELETE CASCADE,
+    categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+    arbitraje INTEGER NOT NULL CHECK (arbitraje >= 0),
+    inscripcion INTEGER NOT NULL CHECK (inscripcion >= 0),
+    PRIMARY KEY (torneo_id, categoria_id)
+);
+CREATE TABLE IF NOT EXISTS cargos (
+    id INTEGER PRIMARY KEY,
+    torneo_id INTEGER NOT NULL REFERENCES torneos(id) ON DELETE RESTRICT,
+    equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+    partido_id INTEGER REFERENCES partidos(id) ON DELETE RESTRICT,
+    concepto TEXT NOT NULL,
+    monto INTEGER NOT NULL CHECK (monto >= 0),
+    fecha TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS cargo_por_partido ON cargos (partido_id, equipo_id)
+    WHERE partido_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS cargo_inscripcion ON cargos (equipo_id)
+    WHERE partido_id IS NULL;
+CREATE TABLE IF NOT EXISTS pagos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE RESTRICT,
+    fecha TEXT NOT NULL,
+    monto INTEGER NOT NULL CHECK (monto > 0),
+    nota TEXT NOT NULL DEFAULT '',
+    anulado INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS aplicaciones (
+    pago_id INTEGER NOT NULL REFERENCES pagos(id) ON DELETE CASCADE,
+    cargo_id INTEGER NOT NULL REFERENCES cargos(id) ON DELETE RESTRICT,
+    monto INTEGER NOT NULL CHECK (monto > 0),
+    PRIMARY KEY (pago_id, cargo_id)
+);
+CREATE TABLE IF NOT EXISTS liguillas (
+    id INTEGER PRIMARY KEY,
+    torneo_id INTEGER NOT NULL REFERENCES torneos(id) ON DELETE RESTRICT,
+    categoria_id INTEGER NOT NULL REFERENCES categorias(id) ON DELETE RESTRICT,
+    desde INTEGER NOT NULL,
+    hasta INTEGER NOT NULL,
+    desempate TEXT NOT NULL,
+    UNIQUE (torneo_id, categoria_id)
+);
+CREATE TABLE IF NOT EXISTS llaves (
+    id INTEGER PRIMARY KEY,
+    liguilla_id INTEGER NOT NULL REFERENCES liguillas(id) ON DELETE CASCADE,
+    ronda INTEGER NOT NULL,
+    orden INTEGER NOT NULL,
+    equipo_a_id INTEGER REFERENCES equipos(id) ON DELETE RESTRICT,
+    semilla_a INTEGER,
+    equipo_b_id INTEGER REFERENCES equipos(id) ON DELETE RESTRICT,
+    semilla_b INTEGER,
+    partido_id INTEGER REFERENCES partidos(id) ON DELETE RESTRICT,
+    ganador_id INTEGER REFERENCES equipos(id) ON DELETE RESTRICT,
+    penales_local INTEGER,
+    penales_visitante INTEGER,
+    UNIQUE (liguilla_id, ronda, orden)
+);
 CREATE TABLE IF NOT EXISTS usuarios (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     usuario TEXT NOT NULL,

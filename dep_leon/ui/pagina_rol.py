@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import rol
+from .. import cobros, liguilla, rol
 from .comun import boton, botones_dialogo, confirmar, error, id_seleccionado, info, llenar, tabla
 
 
@@ -164,9 +164,11 @@ class DialogoPartido(QDialog):
         if partido:
             self.categoria.setEnabled(False)
             # Con resultado capturado, cambiar de equipos dejaría goles de otro partido.
-            if partido["estado"] in (rol.JUGADO, rol.DEFAULT):
+            de_liguilla = liguilla.es_de_liguilla(conn, partido["id"])
+            if de_liguilla or partido["estado"] in (rol.JUGADO, rol.DEFAULT):
                 self.local.setEnabled(False)
                 self.visitante.setEnabled(False)
+            self.jornada.setEnabled(not de_liguilla)
             self.local.setCurrentIndex(self.local.findData(partido["local_id"]))
             self.visitante.setCurrentIndex(self.visitante.findData(partido["visitante_id"]))
             self.jornada.setValue(partido["jornada"])
@@ -227,6 +229,31 @@ class DialogoPartido(QDialog):
         self.accept()
 
 
+def editar_partido(padre: QWidget, conn: sqlite3.Connection, partido_id: int) -> bool:
+    """Abre el formulario del partido y guarda; un partido sin fecha queda programado al dársela."""
+    partido = conn.execute("SELECT * FROM partidos WHERE id = ?", (partido_id,)).fetchone()
+    torneo = conn.execute("SELECT liga_id FROM torneos WHERE id = ?", (partido["torneo_id"],)).fetchone()
+    liga = conn.execute("SELECT * FROM ligas WHERE id = ?", (torneo["liga_id"],)).fetchone()
+    categorias = conn.execute(
+        "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre", (liga["id"],)
+    ).fetchall()
+    dialogo = DialogoPartido(padre, conn, partido["torneo_id"], liga["modalidad"], categorias, partido)
+    if not dialogo.exec():
+        return False
+    fecha, hora, minutos, cancha, local, visitante = dialogo.valores()
+    sin_fecha = partido["estado"] in (rol.POSPUESTO, rol.POR_PROGRAMAR)
+    with conn:
+        conn.execute(
+            "UPDATE partidos SET jornada = ?, local_id = ?, visitante_id = ?, fecha = ?, "
+            "hora = ?, minutos = ?, cancha = ?, estado = ? WHERE id = ?",
+            (
+                dialogo.jornada.value(), local, visitante, fecha.isoformat(), rol.a_hora(hora),
+                minutos, cancha, rol.PROGRAMADO if sin_fecha else partido["estado"], partido["id"],
+            ),
+        )
+    return True
+
+
 class PaginaRol(QWidget):
     def __init__(self, conn: sqlite3.Connection):
         super().__init__()
@@ -254,7 +281,7 @@ class PaginaRol(QWidget):
             filtros.addWidget(control, 1)
 
         self.tabla = tabla(
-            ["Fecha", "Hora", "Equipo", "Equipo", "Categoría", "Cancha", "Jornada", "Estado"], estirar=2
+            ["Fecha", "Hora", "Equipo", "Equipo", "Categoría", "Cancha", "Ronda", "Estado"], estirar=2
         )
         self.tabla.horizontalHeader().setSectionResizeMode(
             3, self.tabla.horizontalHeader().ResizeMode.Stretch
@@ -374,7 +401,7 @@ class PaginaRol(QWidget):
                         date.fromisoformat(p["fecha"]).strftime("%d/%m/%Y") if p["fecha"] else "Por definir",
                         p["hora"] or "Por definir",
                         p["local"], p["visitante"], p["categoria"],
-                        rol.nombre_cancha(p["cancha"]), p["jornada"], p["estado"],
+                        rol.nombre_cancha(p["cancha"]), rol.nombre_jornada(p["jornada"]), p["estado"],
                     ],
                 )
                 for p in filas
@@ -479,35 +506,15 @@ class PaginaRol(QWidget):
 
     def editar(self):
         partido = self._partido_seleccionado()
-        if partido is None:
-            return
-        categorias = self.conn.execute(
-            "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre", (self.liga.currentData(),)
-        ).fetchall()
-        dialogo = DialogoPartido(
-            self, self.conn, self.torneo.currentData(), self._liga()["modalidad"], categorias, partido
-        )
-        if dialogo.exec():
-            fecha, hora, minutos, cancha, local, visitante = dialogo.valores()
-            with self.conn:
-                self.conn.execute(
-                    "UPDATE partidos SET jornada = ?, local_id = ?, visitante_id = ?, fecha = ?, "
-                    "hora = ?, minutos = ?, cancha = ?, estado = ? WHERE id = ?",
-                    (
-                        dialogo.jornada.value(), local, visitante, fecha.isoformat(), rol.a_hora(hora),
-                        minutos, cancha,
-                        rol.PROGRAMADO if partido["estado"] == rol.POSPUESTO else partido["estado"],
-                        partido["id"],
-                    ),
-                )
+        if partido is not None and editar_partido(self, self.conn, partido["id"]):
             self._al_cambiar_torneo()
 
     def posponer(self):
         partido = self._partido_seleccionado()
         if partido is None:
             return
-        if partido["estado"] == rol.POSPUESTO:
-            error(self, "Este partido ya está pospuesto. Usa «Editar o reprogramar» para darle fecha.")
+        if partido["fecha"] is None:
+            error(self, "Este partido no tiene fecha. Usa «Editar o reprogramar» para dársela.")
             return
         if partido["estado"] in (rol.JUGADO, rol.DEFAULT):
             error(self, "Este partido ya tiene resultado. Bórralo en «Resultados» antes de posponerlo.")
@@ -520,12 +527,20 @@ class PaginaRol(QWidget):
         partido = self._partido_seleccionado()
         if partido is None:
             return
+        if liguilla.es_de_liguilla(self.conn, partido["id"]):
+            error(self, "Este partido es de la liguilla. Se administra en la página «Liguilla».")
+            return
         aviso = (
             "Este partido ya tiene resultado. ¿Eliminarlo junto con su marcador y sus goles?"
             if partido["estado"] in (rol.JUGADO, rol.DEFAULT)
             else "¿Eliminar este partido del rol?"
         )
         if confirmar(self, aviso):
-            with self.conn:
-                self.conn.execute("DELETE FROM partidos WHERE id = ?", (partido["id"],))
+            try:
+                with self.conn:
+                    cobros.quitar_cargos_de_partido(self.conn, partido["id"])
+                    self.conn.execute("DELETE FROM partidos WHERE id = ?", (partido["id"],))
+            except ValueError as exc:
+                error(self, str(exc))
+                return
             self._al_cambiar_torneo()

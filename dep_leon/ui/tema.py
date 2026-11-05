@@ -43,6 +43,18 @@ QLabel#tarjetaTexto {{ color: {TEXTO_SUAVE}; }}
 QSpinBox#marcador {{ font-size: 24px; font-weight: 600; }}
 QWidget#listaGoles {{ background: {BLANCO}; }}
 QRadioButton {{ color: {TEXTO}; }}
+QWidget#lienzoLlave {{ background: {FONDO}; }}
+QPushButton#llave {{
+    background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE}; border-radius: 6px;
+    text-align: left; padding: 8px 10px; font-weight: 400;
+}}
+QPushButton#llave:hover {{ background: {FILA_ALTERNA}; }}
+QPushButton#llave:checked {{ background: {VERDE_SUAVE}; border: 2px solid {VERDE}; }}
+QPushButton#llave:disabled {{ background: {FILA_ALTERNA}; color: {TEXTO_SUAVE}; }}
+QLabel#campeon {{
+    background: {BARRA}; color: white; font-size: 18px; font-weight: 600; padding: 8px 14px;
+    border-left: 5px solid {DORADO}; border-radius: 4px;
+}}
 QLabel#seccion {{ font-size: 14px; font-weight: 600; color: {TEXTO}; }}
 QLabel#ayuda {{ color: {TEXTO_SUAVE}; }}
 QLabel#aviso {{ color: {ROJO}; font-weight: 600; }}
@@ -82,26 +94,26 @@ QHeaderView::section {{
     background: {ENCABEZADO_TABLA}; color: {TEXTO}; font-weight: 600; padding: 6px;
     border: none; border-right: 1px solid {BORDE}; border-bottom: 1px solid {BORDE};
 }}
-QLineEdit, QComboBox, QSpinBox, QDateEdit, QTimeEdit {{
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit {{
     background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE};
     border-radius: 5px; padding: 5px;
 }}
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDateEdit:focus, QTimeEdit:focus {{
+QLineEdit:focus, QComboBox:focus, QDoubleSpinBox:focus, QSpinBox:focus, QDateEdit:focus, QTimeEdit:focus {{
     border: 1px solid {VERDE};
 }}
-QSpinBox:disabled, QTimeEdit:disabled {{ background: #EDF1EE; color: #66756D; }}
+QDoubleSpinBox:disabled, QSpinBox:disabled, QTimeEdit:disabled {{ background: #EDF1EE; color: #66756D; }}
 QComboBox::drop-down, QDateEdit::drop-down {{ border: none; width: 24px; }}
 QComboBox::down-arrow, QDateEdit::down-arrow {{ image: url("{FLECHA}"); width: 12px; height: 8px; }}
-QSpinBox::up-button, QTimeEdit::up-button {{
+QDoubleSpinBox::up-button, QSpinBox::up-button, QTimeEdit::up-button {{
     subcontrol-origin: border; subcontrol-position: top right; width: 20px; border: none;
 }}
-QSpinBox::down-button, QTimeEdit::down-button {{
+QDoubleSpinBox::down-button, QSpinBox::down-button, QTimeEdit::down-button {{
     subcontrol-origin: border; subcontrol-position: bottom right; width: 20px; border: none;
 }}
-QSpinBox::up-button:hover, QTimeEdit::up-button:hover,
-QSpinBox::down-button:hover, QTimeEdit::down-button:hover {{ background: {VERDE_SUAVE}; }}
-QSpinBox::up-arrow, QTimeEdit::up-arrow {{ image: url("{FLECHA_ARRIBA}"); width: 9px; height: 6px; }}
-QSpinBox::down-arrow, QTimeEdit::down-arrow {{ image: url("{FLECHA}"); width: 9px; height: 6px; }}
+QDoubleSpinBox::up-button:hover, QSpinBox::up-button:hover, QTimeEdit::up-button:hover,
+QDoubleSpinBox::down-button:hover, QSpinBox::down-button:hover, QTimeEdit::down-button:hover {{ background: {VERDE_SUAVE}; }}
+QDoubleSpinBox::up-arrow, QSpinBox::up-arrow, QTimeEdit::up-arrow {{ image: url("{FLECHA_ARRIBA}"); width: 9px; height: 6px; }}
+QDoubleSpinBox::down-arrow, QSpinBox::down-arrow, QTimeEdit::down-arrow {{ image: url("{FLECHA}"); width: 9px; height: 6px; }}
 QComboBox QAbstractItemView {{
     background: {BLANCO}; color: {TEXTO};
     selection-background-color: {VERDE_SUAVE}; selection-color: {TEXTO};

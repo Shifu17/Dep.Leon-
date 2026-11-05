@@ -24,7 +24,10 @@ computadora, con una cuenta de acceso y código de recuperación.
 - Fase regular todos contra todos, seguida de liguilla de eliminación directa.
 - Puntos: 3 por victoria, 1 por empate, 0 por derrota (configurable).
 - Desempate: diferencia de goles, goles a favor y resultado entre ambos equipos.
-- La liguilla no suma a la tabla regular, pero sí al goleo.
+- Liguilla a partido único. Se elige el rango de lugares que clasifican; si no completan 2, 4, 8 o
+  16 equipos, los mejores lugares pasan directo a la siguiente ronda.
+- El empate en liguilla se define por penales o por mejor lugar en la tabla, a elección.
+- La liguilla no suma a la tabla regular, pero sí al goleo y a los cobros de arbitraje.
 - Una categoría con resultados no se puede generar de nuevo, para no perderlos.
 - Portero menos goleado: se lleva **por equipo** (goles recibidos); no se elige portero por partido.
 - Horario de referencia del rol infantil: partidos cada 50 minutos desde las 9:00.
@@ -38,9 +41,12 @@ Al marcar que un equipo no se presentó, quien captura elige una de estas opcion
 
 ## Cobros
 
-- Inscripción por equipo y por torneo.
-- Arbitraje por equipo y por partido, con monto por categoría.
-- Abonos parciales, adeudos por equipo y recibo en PDF.
+- Montos editables por torneo y categoría. Con monto en cero no se generan cobros de ese tipo.
+- Inscripción: un cargo por equipo y torneo.
+- Arbitraje: un cargo por equipo **al capturar el resultado**, nunca antes; los partidos pospuestos
+  no generan cobro. En un default paga quien se indique.
+- Abonos parciales, adeudos por equipo, ajuste de cada cargo y recibo en PDF con folio.
+- Un pago no se borra: se anula, conserva su folio y lo que cubría vuelve a quedar pendiente.
 
 ## Reportes
 
@@ -62,6 +68,6 @@ usuarios.
 3. Resultados y estadísticas: marcadores, goleadores, default con equipo que paga, clasificación
    y portería menos goleada por equipo. **Hecha.** El cobro de lo que indica el default llega en
    la etapa 4.
-4. Cobros.
-5. Liguilla.
+4. Cobros: montos, cargos automáticos, abonos, adeudos y recibos. **Hecha.**
+5. Liguilla: rango de clasificados, llave, desempate a elegir y avance automático. **Hecha.**
 6. Reportes.
