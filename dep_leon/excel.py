@@ -37,7 +37,7 @@ AJUSTE = Alignment(wrap_text=True, vertical="top")
 def crear_plantilla(conn: sqlite3.Connection, liga_id: int, destino: Path | str) -> None:
     liga = conn.execute("SELECT nombre FROM ligas WHERE id = ?", (liga_id,)).fetchone()
     categorias = conn.execute(
-        "SELECT nombre, anio_min, anio_max FROM categorias WHERE liga_id = ? ORDER BY nombre",
+        "SELECT nombre, anio_min, anio_max FROM categorias WHERE liga_id = ? ORDER BY nombre COLLATE ES",
         (liga_id,),
     ).fetchall()
 

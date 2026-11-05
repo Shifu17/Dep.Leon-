@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import cobros, liguilla, rol
-from .comun import boton, botones_dialogo, confirmar, error, id_seleccionado, info, llenar, tabla
+from .comun import boton, botones_dialogo, confirmar, error, etiqueta, id_seleccionado, info, llenar, tabla
 
 
 def _a_qtime(minutos: int) -> QTime:
@@ -63,6 +63,8 @@ class DialogoGenerar(QDialog):
             for control in (desde, hasta):
                 control.setEnabled(activo)
                 casilla.toggled.connect(control.setEnabled)
+            desde.setAccessibleName(f"{nombre}: primer partido")
+            hasta.setAccessibleName(f"{nombre}: terminar antes de")
             self.dias.append((i, casilla, desde, hasta))
             tabla_dias.addWidget(casilla, i + 1, 0)
             tabla_dias.addWidget(desde, i + 1, 1)
@@ -196,7 +198,7 @@ class DialogoPartido(QDialog):
 
     def _cargar_equipos(self):
         filas = self.conn.execute(
-            "SELECT id, nombre FROM equipos WHERE torneo_id = ? AND categoria_id = ? ORDER BY nombre",
+            "SELECT id, nombre FROM equipos WHERE torneo_id = ? AND categoria_id = ? ORDER BY nombre COLLATE ES",
             (self.torneo_id, self.categoria.currentData()),
         ).fetchall()
         for control in (self.local, self.visitante):
@@ -242,7 +244,7 @@ def editar_partido(padre: QWidget, conn: sqlite3.Connection, partido_id: int) ->
     torneo = conn.execute("SELECT liga_id FROM torneos WHERE id = ?", (partido["torneo_id"],)).fetchone()
     liga = conn.execute("SELECT * FROM ligas WHERE id = ?", (torneo["liga_id"],)).fetchone()
     categorias = conn.execute(
-        "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre", (liga["id"],)
+        "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre COLLATE ES", (liga["id"],)
     ).fetchall()
     dialogo = DialogoPartido(padre, conn, partido["torneo_id"], liga["modalidad"], categorias, partido)
     if not dialogo.exec():
@@ -284,11 +286,11 @@ class PaginaRol(QWidget):
             ("Liga:", self.liga), ("Torneo:", self.torneo),
             ("Categoría:", self.categoria), ("Fecha:", self.fecha),
         ):
-            filtros.addWidget(QLabel(texto))
+            filtros.addWidget(etiqueta(texto, control))
             filtros.addWidget(control, 1)
 
         self.tabla = tabla(
-            ["Fecha", "Hora", "Equipo", "Equipo", "Categoría", "Cancha", "Ronda", "Estado"], estirar=2
+            ["Fecha", "Hora", "Equipo", "Equipo", "Categoría", "Cancha", "Fase", "Estado"], estirar=2
         )
         self.tabla.horizontalHeader().setSectionResizeMode(
             3, self.tabla.horizontalHeader().ResizeMode.Stretch
@@ -319,7 +321,7 @@ class PaginaRol(QWidget):
             """SELECT c.id, c.nombre,
                       (SELECT COUNT(*) FROM equipos e
                        WHERE e.categoria_id = c.id AND e.torneo_id = ?) AS equipos
-               FROM categorias c WHERE c.liga_id = ? ORDER BY c.nombre""",
+               FROM categorias c WHERE c.liga_id = ? ORDER BY c.nombre COLLATE ES""",
             (self.torneo.currentData(), self.liga.currentData()),
         ).fetchall()
 
@@ -346,12 +348,12 @@ class PaginaRol(QWidget):
             control.blockSignals(True)
             control.clear()
         for t in self.conn.execute(
-            "SELECT * FROM torneos WHERE liga_id = ? ORDER BY nombre", (self.liga.currentData(),)
+            "SELECT * FROM torneos WHERE liga_id = ? ORDER BY nombre COLLATE ES", (self.liga.currentData(),)
         ):
             self.torneo.addItem(t["nombre"], t["id"])
         self.categoria.addItem("Todas", None)
         for c in self.conn.execute(
-            "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre", (self.liga.currentData(),)
+            "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre COLLATE ES", (self.liga.currentData(),)
         ):
             self.categoria.addItem(c["nombre"], c["id"])
         self.torneo.setCurrentIndex(max(self.torneo.findData(torneo), 0))
@@ -405,8 +407,8 @@ class PaginaRol(QWidget):
                 (
                     p["id"],
                     [
-                        date.fromisoformat(p["fecha"]).strftime("%d/%m/%Y") if p["fecha"] else "Por definir",
-                        p["hora"] or "Por definir",
+                        date.fromisoformat(p["fecha"]).strftime("%d/%m/%Y") if p["fecha"] else "Sin fecha",
+                        p["hora"] or "-",
                         p["local"], p["visitante"], p["categoria"],
                         rol.nombre_cancha(p["cancha"]), rol.nombre_jornada(p["jornada"]), p["estado"],
                     ],
@@ -420,7 +422,7 @@ class PaginaRol(QWidget):
         if fecha:
             partes = [rol.fecha_larga(date.fromisoformat(fecha))]
         if linea:
-            partes.append(f"Torneo {linea}")
+            partes.append(rol.titulo_torneo(linea))
         self.titulo.setText("\n".join(partes))
 
         if fecha and torneo:
@@ -488,7 +490,7 @@ class PaginaRol(QWidget):
         if not self._exigir_torneo():
             return
         categorias = self.conn.execute(
-            "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre", (self.liga.currentData(),)
+            "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre COLLATE ES", (self.liga.currentData(),)
         ).fetchall()
         if not categorias:
             error(self, "Primero crea una categoría para esta liga.")

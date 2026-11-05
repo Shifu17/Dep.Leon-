@@ -127,6 +127,7 @@ class Ventana(QMainWindow):
         def agregar(texto: str, pagina: QWidget):
             self.pila.addWidget(pagina)
             nav = QPushButton(texto, objectName="nav", checkable=True)
+            nav.setFocusPolicy(Qt.FocusPolicy.TabFocus)
             nav.clicked.connect(lambda: self.pila.setCurrentWidget(pagina))
             grupo.addButton(nav)
             columna.addWidget(nav)

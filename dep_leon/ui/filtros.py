@@ -3,7 +3,9 @@
 import sqlite3
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QWidget
+
+from .comun import etiqueta
 
 
 class FiltrosLiga(QWidget):
@@ -24,7 +26,7 @@ class FiltrosLiga(QWidget):
         fila = QHBoxLayout(self)
         fila.setContentsMargins(0, 0, 0, 0)
         for texto, control in (("Liga:", self.liga), ("Torneo:", self.torneo), ("Categoría:", self.categoria)):
-            fila.addWidget(QLabel(texto))
+            fila.addWidget(etiqueta(texto, control))
             fila.addWidget(control, 1)
         self.refrescar()
 
@@ -61,7 +63,7 @@ class FiltrosLiga(QWidget):
         self.torneo.blockSignals(True)
         self.torneo.clear()
         for t in self.conn.execute(
-            "SELECT id, nombre FROM torneos WHERE liga_id = ? ORDER BY nombre", (self.liga.currentData(),)
+            "SELECT id, nombre FROM torneos WHERE liga_id = ? ORDER BY nombre COLLATE ES", (self.liga.currentData(),)
         ):
             self.torneo.addItem(t["nombre"], t["id"])
         self.torneo.setCurrentIndex(max(self.torneo.findData(actual), 0))
@@ -78,7 +80,7 @@ class FiltrosLiga(QWidget):
             """SELECT c.id, c.nombre,
                       (SELECT COUNT(*) FROM equipos e
                        WHERE e.categoria_id = c.id AND e.torneo_id = ?) AS equipos
-               FROM categorias c WHERE c.liga_id = ? ORDER BY c.nombre""",
+               FROM categorias c WHERE c.liga_id = ? ORDER BY c.nombre COLLATE ES""",
             (self.torneo.currentData(), self.liga.currentData()),
         ).fetchall()
         for c in categorias:

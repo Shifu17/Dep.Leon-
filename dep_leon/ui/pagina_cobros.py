@@ -54,6 +54,8 @@ class DialogoTarifas(QDialog):
         rejilla.addWidget(QLabel("Inscripción por equipo"), 0, 2)
         for i, t in enumerate(tarifas, start=1):
             arbitraje, inscripcion = _campo_monto(t.arbitraje), _campo_monto(t.inscripcion)
+            arbitraje.setAccessibleName(f"Arbitraje de {t.categoria}")
+            inscripcion.setAccessibleName(f"Inscripción de {t.categoria}")
             self.campos[t.categoria_id] = (arbitraje, inscripcion)
             rejilla.addWidget(QLabel(t.categoria), i, 0)
             rejilla.addWidget(arbitraje, i, 1)
@@ -179,8 +181,8 @@ class PaginaCobros(QWidget):
         derecha.addLayout(fila_pagos)
 
         columnas = QHBoxLayout()
-        columnas.addLayout(izquierda, 4)
-        columnas.addLayout(derecha, 5)
+        columnas.addLayout(izquierda, 2)
+        columnas.addLayout(derecha, 3)
 
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)

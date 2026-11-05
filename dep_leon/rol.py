@@ -11,6 +11,8 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import date, timedelta
 
+from .db import clave_orden
+
 CANCHA_FUT_11 = "11"
 CANCHAS_FUT_7 = ["1", "2"]
 MINUTOS_PARTIDO = 50
@@ -44,6 +46,11 @@ def nombre_ronda(restantes: int) -> str:
     return RONDAS[restantes - 1] if restantes <= len(RONDAS) else f"Ronda de {2 ** restantes}"
 
 
+def titulo_torneo(nombre: str) -> str:
+    """Evita «Torneo Torneo de Verano» cuando el nombre ya incluye la palabra."""
+    return nombre if nombre.casefold().startswith("torneo") else f"Torneo {nombre}"
+
+
 def nombre_jornada(jornada: int) -> str:
     if jornada > BASE_LIGUILLA:
         return nombre_ronda(jornada - BASE_LIGUILLA)
@@ -52,7 +59,7 @@ def nombre_jornada(jornada: int) -> str:
 
 def nombre_cancha(cancha: str | None) -> str:
     if not cancha:
-        return "Por definir"
+        return "-"
     return "Fut 11" if cancha == CANCHA_FUT_11 else cancha
 
 
@@ -305,7 +312,7 @@ def generar(
     con_resultados = conn.execute(
         f"""SELECT DISTINCT c.nombre FROM resultados r JOIN partidos p ON p.id = r.partido_id
             JOIN categorias c ON c.id = p.categoria_id
-            WHERE p.torneo_id = ? AND p.categoria_id IN ({marcas}) ORDER BY c.nombre""",
+            WHERE p.torneo_id = ? AND p.categoria_id IN ({marcas}) ORDER BY c.nombre COLLATE ES""",
         (torneo_id, *categoria_ids),
     ).fetchall()
     if con_resultados:
@@ -316,7 +323,7 @@ def generar(
         )
     con_liguilla = conn.execute(
         f"""SELECT c.nombre FROM liguillas g JOIN categorias c ON c.id = g.categoria_id
-            WHERE g.torneo_id = ? AND g.categoria_id IN ({marcas}) ORDER BY c.nombre""",
+            WHERE g.torneo_id = ? AND g.categoria_id IN ({marcas}) ORDER BY c.nombre COLLATE ES""",
         (torneo_id, *categoria_ids),
     ).fetchall()
     if con_liguilla:
@@ -495,7 +502,7 @@ def descansos(
                 ),
             )
         ]
-    return sorted(resultado)
+    return sorted(resultado, key=lambda f: (clave_orden(f[0]), clave_orden(f[1])))
 
 
 def posponer(conn: sqlite3.Connection, partido_id: int) -> None:

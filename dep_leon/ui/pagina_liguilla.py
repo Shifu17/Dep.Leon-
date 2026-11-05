@@ -2,6 +2,7 @@
 
 import sqlite3
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -16,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import liguilla, rol
-from .comun import boton, confirmar, error, info, llenar, tabla
+from .comun import boton, confirmar, error, etiqueta, info, llenar, tabla
 from .filtros import FiltrosLiga
 from .pagina_resultados import borrar_resultado, capturar_partido, marcar_no_presentado
 from .pagina_rol import editar_partido
@@ -69,12 +70,12 @@ class PaginaLiguilla(QWidget):
         self.desempate_nuevo = _combo_desempate()
 
         fila = QHBoxLayout()
-        fila.addWidget(QLabel("Clasifican del lugar"))
+        fila.addWidget(etiqueta("Clasifican del lugar", self.desde))
         fila.addWidget(self.desde)
-        fila.addWidget(QLabel("al lugar"))
+        fila.addWidget(etiqueta("al lugar", self.hasta))
         fila.addWidget(self.hasta)
         fila.addSpacing(16)
-        fila.addWidget(QLabel("Si empatan:"))
+        fila.addWidget(etiqueta("Si empatan:", self.desempate_nuevo))
         fila.addWidget(self.desempate_nuevo)
         fila.addSpacing(16)
         fila.addWidget(boton("Crear liguilla", self.crear))
@@ -102,7 +103,7 @@ class PaginaLiguilla(QWidget):
         acciones.addWidget(boton("No se presentó", self.no_se_presento, "secundario"))
         acciones.addWidget(boton("Borrar resultado", self.borrar, "peligro"))
         acciones.addStretch(1)
-        acciones.addWidget(QLabel("Si empatan:"))
+        acciones.addWidget(etiqueta("Si empatan:", self.desempate))
         acciones.addWidget(self.desempate)
         acciones.addWidget(boton("Eliminar liguilla", self.eliminar, "peligro"))
 
@@ -218,6 +219,8 @@ class PaginaLiguilla(QWidget):
             for v in rondas[numero]:
                 columna.addStretch(1)
                 tarjeta = QPushButton(liguilla.texto_llave(v), objectName="llave", checkable=True)
+                tarjeta.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+                tarjeta.setAccessibleName(f"{v.ronda}: " + liguilla.texto_llave(v).replace("\n", ", "))
                 tarjeta.setEnabled(v.partido_id is not None)
                 tarjeta.setChecked(v.id == self._seleccion)
                 tarjeta.clicked.connect(lambda _=False, i=v.id: self._elegir(i))

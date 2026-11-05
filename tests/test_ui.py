@@ -116,7 +116,7 @@ def test_posponer_mantiene_visible_el_partido_y_todas_no_salta(pagina_rol, conn,
     assert pagina_rol.tabla.rowCount() == 3
     textos = [pagina_rol.tabla.item(r, 7).text() for r in range(3)]
     assert textos.count("Pospuesto") == 1
-    assert pagina_rol.tabla.item(2, 0).text() == "Por definir"
+    assert pagina_rol.tabla.item(2, 0).text() == "Sin fecha"
 
 
 def test_dialogo_de_partido_bloquea_empalme(pagina_rol, conn, monkeypatch):

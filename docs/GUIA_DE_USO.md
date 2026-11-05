@@ -84,7 +84,8 @@ El programa arma las jornadas y:
 Si dos equipos no coinciden en ningún horario, te avisa y deja su partido **sin fecha** para que lo
 programes a mano.
 
-Después puedes **Agregar partido**, **Editar o reprogramar**, **Posponer** o **Eliminar**.
+Después puedes **Agregar partido**, **Editar o reprogramar**, **Posponer** o **Eliminar**. Un partido
+pospuesto o sin coincidencia de horarios aparece como **Sin fecha** hasta que le asignes una.
 
 > **Antes de generar de nuevo:** se borra el rol anterior de esas categorías, incluidos los cambios a mano
 > y los partidos pospuestos. El programa pide confirmar. Si una categoría ya tiene resultados o liguilla,
@@ -98,7 +99,7 @@ En **Resultados**, selecciona un partido y pulsa **Capturar resultado**, o haz d
   autogol, pero no más goles asignados que los del marcador.
 - **Corregir:** vuelve a capturar el partido. **Borrar resultado** lo regresa a por jugar.
 
-Si un equipo no llegó, pulsa **No se presentó un equipo** y elige:
+Si un equipo no llegó, pulsa **No se presentó** y elige:
 
 - **Dar por default:** el equipo presente gana 3-0 (configurable). Indicas quién paga el arbitraje: el
   ausente, el presente, ambos o ninguno.

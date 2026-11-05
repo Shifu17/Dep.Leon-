@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import estadisticas, inicio, rol
-from .comun import llenar, tabla
+from .comun import etiqueta, llenar, tabla
 
 
 def _solo_lectura(columnas: list[str], estirar: int) -> QTableWidget:
@@ -54,7 +54,7 @@ class PaginaInicio(QWidget):
         titulo = QLabel("Inicio", objectName="titulo")
         titulo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         encabezado.addWidget(titulo, 1)
-        encabezado.addWidget(QLabel("Ver:"))
+        encabezado.addWidget(etiqueta("Ver:", self.liga))
         encabezado.addWidget(self.liga)
 
         self.equipos = Tarjeta("Equipos")

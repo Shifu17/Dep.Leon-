@@ -176,14 +176,14 @@ class PaginaLigas(QWidget):
     def refrescar_detalle(self):
         liga_id = id_seleccionado(self.tabla_ligas)
         categorias = self.conn.execute(
-            "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre", (liga_id,)
+            "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre COLLATE ES", (liga_id,)
         )
         llenar(
             self.tabla_categorias,
             [(c["id"], [c["nombre"], _rango(c)]) for c in categorias],
         )
         torneos = self.conn.execute(
-            "SELECT * FROM torneos WHERE liga_id = ? ORDER BY nombre", (liga_id,)
+            "SELECT * FROM torneos WHERE liga_id = ? ORDER BY nombre COLLATE ES", (liga_id,)
         )
         llenar(self.tabla_torneos, [(t["id"], [t["nombre"]]) for t in torneos])
 

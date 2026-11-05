@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHeaderView,
+    QLabel,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -14,8 +15,37 @@ from PySide6.QtWidgets import (
 )
 
 
+# Texto a la izquierda, cantidades a la derecha y códigos cortos al centro, para leer en columna.
+COLUMNAS_DERECHA = {
+    "Jugadores", "Goles", "PJ", "PG", "PE", "PP", "GF", "GC", "DG", "Pts", "Cargos", "Pagado",
+    "Saldo", "Monto", "Recibidos", "Promedio", "Categorías", "Equipos", "Por jugar", "Jugados",
+    "Pospuestos",
+}
+COLUMNAS_CENTRO = {"Marcador", "Cancha", "Núm.", "Pos.", "#", "Lugar", "Foto", "Renglón"}
+
+
+def alineacion_de(columna: str) -> Qt.AlignmentFlag:
+    if columna in COLUMNAS_DERECHA:
+        horizontal = Qt.AlignmentFlag.AlignRight
+    elif columna in COLUMNAS_CENTRO:
+        horizontal = Qt.AlignmentFlag.AlignHCenter
+    else:
+        horizontal = Qt.AlignmentFlag.AlignLeft
+    return horizontal | Qt.AlignmentFlag.AlignVCenter
+
+
+def etiqueta(texto: str, control: QWidget) -> QLabel:
+    """Etiqueta ligada a su control, para que un lector de pantalla los anuncie juntos."""
+    resultado = QLabel(texto)
+    resultado.setBuddy(control)
+    control.setAccessibleName(texto.rstrip(":"))
+    return resultado
+
+
 def boton(texto: str, al_pulsar, estilo: str | None = None) -> QPushButton:
     resultado = QPushButton(texto)
+    # El contorno de foco aparece al usar Tab, no cada vez que se hace clic.
+    resultado.setFocusPolicy(Qt.FocusPolicy.TabFocus)
     if estilo:
         resultado.setObjectName(estilo)
     resultado.clicked.connect(al_pulsar)
@@ -25,6 +55,9 @@ def boton(texto: str, al_pulsar, estilo: str | None = None) -> QPushButton:
 def tabla(columnas: list[str], estirar: int | None = None) -> QTableWidget:
     resultado = QTableWidget(0, len(columnas))
     resultado.setHorizontalHeaderLabels(columnas)
+    resultado.setAccessibleName("Tabla: " + ", ".join(columnas))
+    for i, columna in enumerate(columnas):
+        resultado.horizontalHeaderItem(i).setTextAlignment(alineacion_de(columna))
     resultado.setAlternatingRowColors(True)
     resultado.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
     resultado.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -47,7 +80,9 @@ def llenar(tabla_: QTableWidget, filas: list[tuple[int, list]]) -> None:
     for r, (identificador, valores) in enumerate(filas):
         for c, valor in enumerate(valores):
             celda = QTableWidgetItem("" if valor is None else str(valor))
-            celda.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            celda.setTextAlignment(Qt.AlignmentFlag(tabla_.horizontalHeaderItem(c).textAlignment()))
+            # Si un nombre largo no cabe, se puede leer completo al pasar el mouse.
+            celda.setToolTip(celda.text())
             celda.setData(Qt.ItemDataRole.UserRole, identificador)
             tabla_.setItem(r, c, celda)
         if identificador == seleccion:

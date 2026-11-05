@@ -50,14 +50,14 @@ class HojaLlave:
 
 
 def _torneo(conn: sqlite3.Connection, torneo_id: int) -> str:
-    return f"Torneo {conn.execute('SELECT nombre FROM torneos WHERE id = ?', (torneo_id,)).fetchone()[0]}"
+    return rol.titulo_torneo(conn.execute("SELECT nombre FROM torneos WHERE id = ?", (torneo_id,)).fetchone()[0])
 
 
 def _categorias(conn, torneo_id: int, categoria_id: int | None) -> list[sqlite3.Row]:
     """Categorías del torneo que tienen equipos, o solo la indicada."""
     return conn.execute(
         """SELECT DISTINCT c.id, c.nombre FROM categorias c JOIN equipos e ON e.categoria_id = c.id
-           WHERE e.torneo_id = ? AND (? IS NULL OR c.id = ?) ORDER BY c.nombre""",
+           WHERE e.torneo_id = ? AND (? IS NULL OR c.id = ?) ORDER BY c.nombre COLLATE ES""",
         (torneo_id, categoria_id, categoria_id),
     ).fetchall()
 

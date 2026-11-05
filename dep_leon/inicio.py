@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from . import rol
+from .db import clave_orden
 
 
 @dataclass(frozen=True)
@@ -77,7 +78,7 @@ def equipos_proxima_fecha(
                     "categoria": p["categoria"], "cancha": p["cancha"],
                 }
             )
-    equipos.sort(key=lambda e: (e["hora"], e["categoria"], e["equipo"]))
+    equipos.sort(key=lambda e: (e["hora"], e["categoria"], clave_orden(e["equipo"])))
     return date.fromisoformat(primero["fecha"]), equipos
 
 

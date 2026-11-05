@@ -42,7 +42,7 @@ def tarifas(conn: sqlite3.Connection, torneo_id: int) -> list[Tarifa]:
         """SELECT c.id, c.nombre, COALESCE(x.arbitraje, 0), COALESCE(x.inscripcion, 0)
            FROM torneos t JOIN categorias c ON c.liga_id = t.liga_id
            LEFT JOIN tarifas x ON x.torneo_id = t.id AND x.categoria_id = c.id
-           WHERE t.id = ? ORDER BY c.nombre""",
+           WHERE t.id = ? ORDER BY c.nombre COLLATE ES""",
         (torneo_id,),
     ).fetchall()
     return [Tarifa(*f) for f in filas]
@@ -210,7 +210,7 @@ def adeudos(conn: sqlite3.Connection, torneo_id: int, categoria_id: int | None =
                         WHERE x.equipo_id = e.id), 0)
            FROM equipos e JOIN categorias c ON c.id = e.categoria_id
            WHERE e.torneo_id = ? AND (? IS NULL OR e.categoria_id = ?)
-           ORDER BY c.nombre, e.nombre""",
+           ORDER BY c.nombre COLLATE ES, e.nombre COLLATE ES""",
         (torneo_id, categoria_id, categoria_id),
     ).fetchall()
     return [Adeudo(*f) for f in filas]

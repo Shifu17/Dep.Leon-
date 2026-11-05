@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import liguilla, resultados, rol
-from .comun import boton, botones_dialogo, confirmar, error, id_seleccionado, llenar, tabla
+from .comun import boton, botones_dialogo, confirmar, error, etiqueta, id_seleccionado, llenar, tabla
 from .filtros import FiltrosLiga
 
 GOLES_MAXIMOS = 99
@@ -75,10 +75,12 @@ class DialogoResultado(QDialog):
                 self.penales_visitante.setValue(llave["penales_visitante"])
             fila = QHBoxLayout()
             fila.addWidget(QLabel("Penales, solo si empatan:"))
-            fila.addWidget(QLabel(local))
+            fila.addWidget(etiqueta(local, self.penales_local))
             fila.addWidget(self.penales_local)
-            fila.addWidget(QLabel(visitante))
+            fila.addWidget(etiqueta(visitante, self.penales_visitante))
             fila.addWidget(self.penales_visitante)
+            self.penales_local.setAccessibleName(f"Penales de {local}")
+            self.penales_visitante.setAccessibleName(f"Penales de {visitante}")
             fila.addStretch(1)
             raiz.addLayout(fila)
 
@@ -95,6 +97,7 @@ class DialogoResultado(QDialog):
         columna = QVBoxLayout()
         columna.addWidget(QLabel(nombre, objectName="seccion", alignment=Qt.AlignmentFlag.AlignCenter))
         marcador.setObjectName("marcador")
+        marcador.setAccessibleName(f"Goles de {nombre}")
         marcador.setAlignment(Qt.AlignmentFlag.AlignCenter)
         columna.addWidget(marcador)
         columna.addWidget(QLabel("Goleadores"))
@@ -107,6 +110,7 @@ class DialogoResultado(QDialog):
         for i, j in enumerate(jugadores):
             control = QSpinBox(minimum=0, maximum=GOLES_MAXIMOS, value=previos.get(j["id"], 0))
             self.goles[j["id"]] = control
+            control.setAccessibleName(f"Goles de {j['nombre']}, número {j['numero']}")
             rejilla.addWidget(QLabel(f"{j['numero']}  {j['nombre']}"), i, 0)
             rejilla.addWidget(control, i, 1)
         rejilla.setRowStretch(len(jugadores), 1)
@@ -242,17 +246,17 @@ class PaginaResultados(QWidget):
         self.ver.currentIndexChanged.connect(self.refrescar_partidos)
         filtros = QHBoxLayout()
         filtros.addWidget(self.filtros, 4)
-        filtros.addWidget(QLabel("Ver:"))
+        filtros.addWidget(etiqueta("Ver:", self.ver))
         filtros.addWidget(self.ver, 1)
 
         acciones = QHBoxLayout()
         acciones.addWidget(boton("Capturar resultado", self.capturar))
-        acciones.addWidget(boton("No se presentó un equipo", self.no_se_presento, "secundario"))
+        acciones.addWidget(boton("No se presentó", self.no_se_presento, "secundario"))
         acciones.addWidget(boton("Borrar resultado", self.borrar, "peligro"))
         acciones.addStretch(1)
 
         self.tabla = tabla(
-            ["Fecha", "Hora", "Equipo", "Marcador", "Equipo", "Categoría", "Ronda", "Estado"], estirar=2
+            ["Fecha", "Hora", "Equipo", "Marcador", "Equipo", "Categoría", "Fase", "Estado"], estirar=2
         )
         self.tabla.horizontalHeader().setSectionResizeMode(
             4, self.tabla.horizontalHeader().ResizeMode.Stretch
@@ -297,8 +301,8 @@ class PaginaResultados(QWidget):
                 (
                     p["id"],
                     [
-                        date.fromisoformat(p["fecha"]).strftime("%d/%m/%Y") if p["fecha"] else "Por definir",
-                        p["hora"] or "Por definir", p["local"],
+                        date.fromisoformat(p["fecha"]).strftime("%d/%m/%Y") if p["fecha"] else "Sin fecha",
+                        p["hora"] or "-", p["local"],
                         f"{p['goles_local']} - {p['goles_visitante']}" if p["goles_local"] is not None else "-",
                         p["visitante"], p["categoria"], rol.nombre_jornada(p["jornada"]), p["estado"],
                     ],

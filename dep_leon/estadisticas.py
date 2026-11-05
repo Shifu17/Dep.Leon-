@@ -4,6 +4,7 @@ import sqlite3
 from dataclasses import dataclass
 from itertools import groupby
 
+from .db import clave_orden
 from .reglas import obtener_reglas
 
 
@@ -83,7 +84,7 @@ def _desempatar(grupo: list[FilaTabla], partidos, reglas) -> list[FilaTabla]:
                 _sumar(mini[p["local_id"]], p["goles_local"], p["goles_visitante"], reglas)
                 _sumar(mini[p["visitante_id"]], p["goles_visitante"], p["goles_local"], reglas)
         grupo.sort(
-            key=lambda f: (-mini[f.equipo_id].pts, -mini[f.equipo_id].dg, f.nombre.casefold())
+            key=lambda f: (-mini[f.equipo_id].pts, -mini[f.equipo_id].dg, clave_orden(f.nombre))
         )
     return grupo
 
@@ -94,7 +95,7 @@ def goleadores(conn: sqlite3.Connection, torneo_id: int, categoria_id: int) -> l
            FROM goles g JOIN jugadores j ON j.id = g.jugador_id
            JOIN equipos e ON e.id = j.equipo_id JOIN partidos p ON p.id = g.partido_id
            WHERE p.torneo_id = ? AND p.categoria_id = ?
-           GROUP BY j.id ORDER BY goles DESC, j.nombre""",
+           GROUP BY j.id ORDER BY goles DESC, j.nombre COLLATE ES""",
         (torneo_id, categoria_id),
     ).fetchall()
 
@@ -102,7 +103,7 @@ def goleadores(conn: sqlite3.Connection, torneo_id: int, categoria_id: int) -> l
 def menos_goleados(tabla: list[FilaTabla]) -> list[FilaTabla]:
     """Portería menos goleada por equipo: menos goles en contra y, a igualdad, más partidos."""
     jugaron = [f for f in tabla if f.pj]
-    return sorted(jugaron, key=lambda f: (f.gc / f.pj, -f.pj, f.nombre.casefold()))
+    return sorted(jugaron, key=lambda f: (f.gc / f.pj, -f.pj, clave_orden(f.nombre)))
 
 
 @dataclass(frozen=True)
@@ -122,7 +123,7 @@ def lideres(conn: sqlite3.Connection, liga_id: int | None = None) -> list[Lider]
            FROM resultados r JOIN partidos p ON p.id = r.partido_id
            JOIN torneos t ON t.id = p.torneo_id JOIN categorias c ON c.id = p.categoria_id
            WHERE ? IS NULL OR t.liga_id = ?
-           ORDER BY t.nombre, c.nombre""",
+           ORDER BY t.nombre COLLATE ES, c.nombre COLLATE ES""",
         (liga_id, liga_id),
     ).fetchall()
     resultado = []

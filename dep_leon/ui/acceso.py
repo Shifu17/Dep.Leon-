@@ -30,6 +30,7 @@ def _boton(texto: str, al_pulsar, estilo: str | None = None) -> QPushButton:
     """Botón que no se activa solo con Enter: cada campo decide qué hace esa tecla."""
     resultado = QPushButton(texto)
     resultado.setAutoDefault(False)
+    resultado.setFocusPolicy(Qt.FocusPolicy.TabFocus)
     if estilo:
         resultado.setObjectName(estilo)
     resultado.clicked.connect(al_pulsar)

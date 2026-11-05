@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 from .. import cobros, credenciales, excel, rol
 from ..jugadores import NUMERO_MAX, POSICIONES, borrar_foto, error_de_edad, guardar_foto
 from ..paths import fotos_dir
-from .comun import boton, botones_dialogo, confirmar, error, id_seleccionado, info, llenar, tabla
+from .comun import boton, botones_dialogo, confirmar, error, etiqueta, id_seleccionado, info, llenar, tabla
 
 
 class DialogoEquipo(QDialog):
@@ -75,6 +75,8 @@ class DialogoDisponibilidad(QDialog):
             casilla = QCheckBox(nombre, checked=i in dias)
             inicio = QTimeEdit(QTime(desde // 60, desde % 60), displayFormat="HH:mm")
             fin = QTimeEdit(QTime(hasta // 60, hasta % 60), displayFormat="HH:mm")
+            inicio.setAccessibleName(f"{nombre}: desde")
+            fin.setAccessibleName(f"{nombre}: hasta")
             self.filas.append((i, casilla, inicio, fin))
             rejilla.addWidget(casilla, i + 1, 0)
             rejilla.addWidget(inicio, i + 1, 1)
@@ -263,7 +265,7 @@ class PaginaEquipos(QWidget):
 
         filtros = QHBoxLayout()
         for texto, control in (("Liga:", self.liga), ("Torneo:", self.torneo), ("Categoría:", self.categoria)):
-            filtros.addWidget(QLabel(texto))
+            filtros.addWidget(etiqueta(texto, control))
             filtros.addWidget(control, 1)
 
         excel_fila = QHBoxLayout()
@@ -315,7 +317,7 @@ class PaginaEquipos(QWidget):
 
     def _categorias(self):
         return self.conn.execute(
-            "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre", (self._liga_id(),)
+            "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre COLLATE ES", (self._liga_id(),)
         ).fetchall()
 
     def refrescar(self):
@@ -341,7 +343,7 @@ class PaginaEquipos(QWidget):
             control.blockSignals(True)
             control.clear()
         for t in self.conn.execute(
-            "SELECT * FROM torneos WHERE liga_id = ? ORDER BY nombre", (self._liga_id(),)
+            "SELECT * FROM torneos WHERE liga_id = ? ORDER BY nombre COLLATE ES", (self._liga_id(),)
         ):
             self.torneo.addItem(t["nombre"], t["id"])
         self.categoria.addItem("Todas", None)
@@ -359,7 +361,7 @@ class PaginaEquipos(QWidget):
                FROM equipos e JOIN categorias c ON c.id = e.categoria_id
                LEFT JOIN jugadores j ON j.equipo_id = e.id
                WHERE e.torneo_id = ? AND (? IS NULL OR e.categoria_id = ?)
-               GROUP BY e.id ORDER BY c.nombre, e.nombre""",
+               GROUP BY e.id ORDER BY c.nombre COLLATE ES, e.nombre COLLATE ES""",
             (self._torneo_id(), self.categoria.currentData(), self.categoria.currentData()),
         )
         llenar(

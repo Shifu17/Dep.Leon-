@@ -8,11 +8,12 @@ FONDO = "#F4F7F5"
 BLANCO = "#FFFFFF"
 TEXTO = "#1E2B25"
 TEXTO_SUAVE = "#52635A"
-BORDE = "#CBD8D0"
+BORDE = "#CBD8D0"  # separa superficies; no identifica controles
+BORDE_CONTROL = "#7A8C82"  # contorno de campos y botones claros: 3:1 o más
+BORDE_PELIGRO = "#C9746C"
 BARRA = "#10291D"
 BARRA_HOVER = "#1B3D2C"
 VERDE = "#1E7F4C"
-VERDE_HOVER = "#23925A"
 VERDE_ACTIVO = "#176A3E"
 VERDE_SUAVE = "#D3EADC"
 FILA_ALTERNA = "#F1F6F3"
@@ -29,7 +30,10 @@ QWidget#panelLogo {{ background: {BARRA}; }}
 QWidget#panelFormulario {{ background: {BLANCO}; }}
 QWidget#barra {{ background: {BARRA}; }}
 QLabel {{ color: {TEXTO}; }}
-QCheckBox {{ color: {TEXTO}; }}
+QCheckBox, QRadioButton {{
+    color: {TEXTO}; border: 1px solid transparent; border-radius: 3px; padding: 1px 3px;
+}}
+QCheckBox:focus, QRadioButton:focus {{ border-color: {VERDE_ACTIVO}; }}
 
 QLabel#titulo {{
     background: {BLANCO}; color: {VERDE_ACTIVO}; font-size: 19px; font-weight: 600;
@@ -42,7 +46,6 @@ QLabel#tarjetaNumero {{ color: {TEXTO}; font-size: 30px; font-weight: 600; }}
 QLabel#tarjetaTexto {{ color: {TEXTO_SUAVE}; }}
 QSpinBox#marcador {{ font-size: 24px; font-weight: 600; }}
 QWidget#listaGoles {{ background: {BLANCO}; }}
-QRadioButton {{ color: {TEXTO}; }}
 QWidget#lienzoLlave {{ background: {FONDO}; }}
 QPushButton#llave {{
     background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE}; border-radius: 6px;
@@ -51,6 +54,7 @@ QPushButton#llave {{
 QPushButton#llave:hover {{ background: {FILA_ALTERNA}; }}
 QPushButton#llave:checked {{ background: {VERDE_SUAVE}; border: 2px solid {VERDE}; }}
 QPushButton#llave:disabled {{ background: {FILA_ALTERNA}; color: {TEXTO_SUAVE}; }}
+QPushButton#llave:focus {{ border: 2px solid {BARRA}; padding: 7px 9px; }}
 QLabel#campeon {{
     background: {BARRA}; color: white; font-size: 18px; font-weight: 600; padding: 8px 14px;
     border-left: 5px solid {DORADO}; border-radius: 4px;
@@ -72,34 +76,49 @@ QPushButton#nav:checked {{
     background: {VERDE}; color: white; font-weight: 600; border-left: 4px solid {DORADO};
 }}
 QPushButton#nav:disabled {{ color: #8FA59A; }}
+QPushButton#nav:focus {{
+    background: {BARRA_HOVER}; border: 2px solid {DORADO}; padding: 9px 12px 9px 16px;
+}}
+QPushButton#nav:checked:focus {{ background: {VERDE}; border: 2px solid white; }}
 
 QPushButton {{
     background: {VERDE}; color: white; border: 1px solid {VERDE}; border-radius: 6px;
     padding: 7px 14px; font-weight: 600;
 }}
-QPushButton:hover {{ background: {VERDE_HOVER}; }}
-QPushButton:pressed {{ background: {VERDE_ACTIVO}; }}
+QPushButton:hover {{ background: {VERDE_ACTIVO}; border-color: {VERDE_ACTIVO}; }}
+QPushButton:pressed {{ background: {BARRA}; border-color: {BARRA}; }}
+QPushButton:focus {{ border: 2px solid {BARRA}; padding: 6px 13px; }}
 QPushButton:disabled {{ background: #BCCBC2; border-color: #BCCBC2; color: #46564D; }}
-QPushButton#secundario {{ background: {BLANCO}; color: {VERDE_ACTIVO}; border: 1px solid {BORDE}; }}
-QPushButton#secundario:hover {{ background: {VERDE_SUAVE}; }}
-QPushButton#peligro {{ background: {BLANCO}; color: {ROJO}; border: 1px solid #E3BDB8; }}
-QPushButton#peligro:hover {{ background: {ROJO_SUAVE}; }}
+QPushButton#secundario {{ background: {BLANCO}; color: {VERDE_ACTIVO}; border: 1px solid {BORDE_CONTROL}; }}
+QPushButton#secundario:hover {{ background: {VERDE_SUAVE}; border-color: {VERDE_ACTIVO}; }}
+QPushButton#secundario:pressed {{ background: {VERDE_SUAVE}; }}
+QPushButton#secundario:focus {{ border: 2px solid {BARRA}; padding: 6px 13px; }}
+QPushButton#peligro {{ background: {BLANCO}; color: {ROJO}; border: 1px solid {BORDE_PELIGRO}; }}
+QPushButton#peligro:hover {{ background: {ROJO_SUAVE}; border-color: {ROJO}; }}
+QPushButton#peligro:pressed {{ background: {ROJO_SUAVE}; }}
+QPushButton#peligro:focus {{ border: 2px solid {ROJO}; padding: 6px 13px; }}
 
 QTableWidget {{
     background: {BLANCO}; alternate-background-color: {FILA_ALTERNA}; color: {TEXTO};
     gridline-color: #E3EAE6; border: 1px solid {BORDE}; border-radius: 6px;
     selection-background-color: {VERDE_SUAVE}; selection-color: {TEXTO};
 }}
+QTableWidget:focus {{ border: 2px solid {VERDE}; }}
+QTableWidget::item {{ padding: 0 3px; }}
+QTableWidget::item:selected {{
+    background: {VERDE_SUAVE}; color: {TEXTO};
+    border-top: 1px solid {VERDE}; border-bottom: 1px solid {VERDE};
+}}
 QHeaderView::section {{
     background: {ENCABEZADO_TABLA}; color: {TEXTO}; font-weight: 600; padding: 6px;
     border: none; border-right: 1px solid {BORDE}; border-bottom: 1px solid {BORDE};
 }}
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit {{
-    background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE};
+    background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE_CONTROL};
     border-radius: 5px; padding: 5px;
 }}
 QLineEdit:focus, QComboBox:focus, QDoubleSpinBox:focus, QSpinBox:focus, QDateEdit:focus, QTimeEdit:focus {{
-    border: 1px solid {VERDE};
+    border: 2px solid {VERDE}; padding: 4px;
 }}
 QDoubleSpinBox:disabled, QSpinBox:disabled, QTimeEdit:disabled {{ background: #EDF1EE; color: #66756D; }}
 QComboBox::drop-down, QDateEdit::drop-down {{ border: none; width: 24px; }}

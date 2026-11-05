@@ -2,6 +2,7 @@
 
 import sqlite3
 import tempfile
+import unicodedata
 import zipfile
 from pathlib import Path, PurePosixPath
 
@@ -213,8 +214,21 @@ CATEGORIAS_INFANTILES = [
 ]
 
 
+def clave_orden(texto: str) -> str:
+    """Clave de orden alfabético en español: sin distinguir acentos, con la ñ después de la n."""
+    plano = texto.casefold().replace("ñ", "n\uffff")
+    sin_acentos = unicodedata.normalize("NFD", plano)
+    return "".join(c for c in sin_acentos if not unicodedata.combining(c))
+
+
+def _comparar_es(a: str, b: str) -> int:
+    x, y = clave_orden(a), clave_orden(b)
+    return (x > y) - (x < y)
+
+
 def conectar(ruta: Path | str) -> sqlite3.Connection:
     conn = sqlite3.connect(ruta)
+    conn.create_collation("ES", _comparar_es)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(ESQUEMA)
