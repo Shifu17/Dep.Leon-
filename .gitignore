@@ -11,3 +11,6 @@ dist/
 *.db-shm
 fotos/
 *.xlsx
+
+# Respaldos del programa
+Respaldo*.zip

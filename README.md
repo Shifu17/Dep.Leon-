@@ -1,41 +1,88 @@
-# Deportivo León
+<div align="center">
+  <img src="dep_leon/assets/logo.png" alt="Escudo de Deportivo León, Saltillo A.C." width="220">
 
-Programa de escritorio para Windows para administrar la liga. Los requisitos y las etapas están
-en [docs/REQUISITOS.md](docs/REQUISITOS.md).
+  <h1>Deportivo León</h1>
 
-## Desarrollo
+  <p><strong>Programa de escritorio para organizar una liga de futbol: equipos, rol de juegos,
+  resultados, estadísticas, liguilla, cobros y reportes.</strong></p>
 
-```powershell
-python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements-dev.txt
-.venv\Scripts\python main.py      # abrir el programa
-.venv\Scripts\python -m pytest    # correr las pruebas
-```
+  <p>
+    <a href="https://github.com/Shifu17/Dep.Leon-/releases/latest"><strong>Descargar para Windows</strong></a>
+    ·
+    <a href="docs/GUIA_DE_USO.md">Guía de uso</a>
+    ·
+    <a href="docs/REQUISITOS.md">Reglas de la liga</a>
+    ·
+    <a href="docs/DESARROLLO.md">Guía técnica</a>
+  </p>
+</div>
 
-Los datos se guardan en `%LOCALAPPDATA%\DeportivoLeon`, fuera del programa y del repositorio.
-Para probar sin tocarlos, define la variable `DEP_LEON_DATA` con otra carpeta.
+![Pantalla de inicio con el resumen de la liga, los próximos juegos y los líderes](docs/img/inicio.png)
 
-## Generar el ejecutable
+## Para qué sirve
 
-```powershell
-.venv\Scripts\pyinstaller --noconfirm DeportivoLeon.spec
-```
+Deportivo León reúne en un solo programa lo que normalmente se lleva en hojas sueltas: quién juega,
+cuándo, cómo van las tablas y quién debe cuánto. Funciona **sin internet**, en una sola computadora, y
+tus datos se quedan en ella.
 
-El resultado queda en `dist\DeportivoLeon.exe`.
+| Área | Qué puedes hacer |
+|---|---|
+| **Ligas y categorías** | Administrar ligas por día, Fut 7 y Fut 11, categorías por año de nacimiento y torneos. |
+| **Equipos y jugadores** | Registrar jugadores a mano o desde una plantilla de Excel, con foto, y generar credenciales en PDF. |
+| **Rol de juegos** | Generar jornadas, repartir partidos según la disponibilidad de cada equipo y evitar empalmes de cancha. |
+| **Resultados** | Capturar marcadores y goleadores, posponer partidos o darlos por default indicando quién paga. |
+| **Estadísticas** | Consultar clasificación, tabla de goleadores y portería menos goleada, con puntos configurables. |
+| **Liguilla** | Elegir el rango de clasificados y armar la llave a partido único; el ganador avanza solo hasta el campeón. |
+| **Cobros** | Llevar inscripciones, arbitrajes, abonos y adeudos, con recibos en PDF. |
+| **Reportes** | Generar PDF para imprimir e imágenes para compartir por WhatsApp. |
 
-## Publicar una actualización
+## Cómo se ve
 
-El programa instalado consulta la última versión publicada en GitHub cuando hay internet.
+| Rol de juegos | Estadísticas |
+|---|---|
+| ![Rol de juegos por fecha, cancha y categoría](docs/img/rol.png) | ![Clasificación, goleadores y portería menos goleada](docs/img/estadisticas.png) |
 
-1. Sube `__version__` en `dep_leon/__init__.py` y genera el ejecutable.
-2. Calcula la huella del archivo:
-   ```powershell
-   (Get-FileHash dist\DeportivoLeon.exe -Algorithm SHA256).Hash | Set-Content -NoNewline dist\DeportivoLeon.exe.sha256
-   ```
-3. Publica la versión con ambos archivos. Los nombres deben ser exactamente estos:
-   ```powershell
-   gh release create v0.2.0 dist\DeportivoLeon.exe dist\DeportivoLeon.exe.sha256 --notes "Qué cambió"
-   ```
+| Liguilla | Cobros |
+|---|---|
+| ![Llave de liguilla con semifinales y final](docs/img/liguilla.png) | ![Adeudos por equipo, cargos y pagos](docs/img/cobros.png) |
 
-El repositorio es público: nunca subas la base de datos, las fotos ni archivos con datos de
-jugadores.
+**Imagen lista para WhatsApp:**
+
+![Rol de juegos de una fecha, generado como imagen](docs/img/reporte_rol.png)
+
+> Todas las capturas usan equipos y resultados inventados.
+
+## Empezar en 3 pasos
+
+1. Descarga `DeportivoLeon.exe` desde la [última versión](https://github.com/Shifu17/Dep.Leon-/releases/latest).
+   No necesitas instalar nada más.
+2. Ábrelo. Si Windows muestra «Windows protegió su PC», es porque el programa no tiene firma digital:
+   pulsa **Más información** y luego **Ejecutar de todas formas**.
+3. Crea tu cuenta y **guarda el código de recuperación** fuera de la computadora. Es la única forma de
+   volver a entrar si olvidas la contraseña.
+
+La [guía de uso](docs/GUIA_DE_USO.md) sigue el recorrido completo, desde crear un torneo hasta sacar
+reportes.
+
+## Tus datos
+
+- Se guardan solo en tu computadora, en `%LOCALAPPDATA%\DeportivoLeon`, y **nunca se suben a este
+  repositorio**.
+- Sin internet el programa funciona igual. Con internet, solo consulta si hay una versión nueva, te avisa
+  y la instala únicamente si aceptas, después de crear un respaldo.
+- La contraseña protege la entrada al programa, pero **no cifra los datos**. Crea respaldos desde
+  **Configuración** y guárdalos en un lugar seguro, porque contienen datos y fotos de jugadores.
+
+## Documentación
+
+| Documento | Para quién |
+|---|---|
+| [Guía de uso](docs/GUIA_DE_USO.md) | Quien administra la liga. |
+| [Reglas de la liga](docs/REQUISITOS.md) | Quien quiera saber cómo decide el programa: puntos, desempates, cobros. |
+| [Guía técnica](docs/DESARROLLO.md) | Quien vaya a modificar o publicar el programa. |
+
+## Estado del proyecto
+
+En desarrollo activo, con las 6 etapas planeadas ya construidas. Está probado con pruebas automáticas y
+**falta su validación en uso real con los datos de la liga**. Funciona solo en Windows y está pensado para
+una sola computadora y una sola cuenta.

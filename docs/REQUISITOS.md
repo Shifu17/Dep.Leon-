@@ -1,4 +1,7 @@
-# Deportivo León: requisitos
+# Reglas de la liga
+
+Cómo funciona la liga y cómo decide el programa. Para el paso a paso, consulta la
+[guía de uso](GUIA_DE_USO.md).
 
 Programa de escritorio para Windows, en Python y en español, para administrarlo en una sola
 computadora, con una cuenta de acceso y código de recuperación.
@@ -64,17 +67,3 @@ Al marcar que un equipo no se presentó, quien captura elige una de estas opcion
 
 Tarjetas, sanciones, asistencia, exportación a Excel de tablas, varias computadoras y varios
 usuarios.
-
-## Etapas
-
-1. Ligas, categorías, torneos, equipos y jugadores, con importación desde Excel, credenciales,
-   respaldo y actualizaciones. **Hecha.**
-2. Rol de juegos: generación automática por categoría, descansos, control de empalmes, edición,
-   reprogramación y partidos pospuestos. **Hecha.** La hoja del rol en PDF e imagen llega en la
-   etapa 6.
-3. Resultados y estadísticas: marcadores, goleadores, default con equipo que paga, clasificación
-   y portería menos goleada por equipo. **Hecha.** El cobro de lo que indica el default llega en
-   la etapa 4.
-4. Cobros: montos, cargos automáticos, abonos, adeudos y recibos. **Hecha.**
-5. Liguilla: rango de clasificados, llave, desempate a elegir y avance automático. **Hecha.**
-6. Reportes en PDF e imagen, con vista previa. **Hecha.**
