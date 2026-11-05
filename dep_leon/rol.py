@@ -127,10 +127,10 @@ class PartidoPlan:
     jornada: int
     local_id: int
     visitante_id: int
-    fecha: date
-    hora: int
+    fecha: date | None
+    hora: int | None
     minutos: int
-    cancha: str
+    cancha: str | None
 
 
 @dataclass(frozen=True)
@@ -168,17 +168,42 @@ def _intercalar(listas: list[list]) -> list:
     return resultado
 
 
+def _disponible(rango_por_dia: dict[int, tuple[int, int]] | None, dia: int, hora: int, minutos: int) -> bool:
+    """Un equipo sin restricciones registradas puede jugar siempre."""
+    if not rango_por_dia:
+        return True
+    rango = rango_por_dia.get(dia)
+    return rango is not None and rango[0] <= hora and hora + minutos <= rango[1]
+
+
 def programar(
     jornadas_por_categoria: dict[int, list[list[tuple[int, int]]]],
     horario: Horario,
     ocupados: list[Ocupado],
+    disponibilidad: dict[int, dict[int, tuple[int, int]]] | None = None,
 ) -> tuple[list[PartidoPlan], list[str]]:
     """Asigna fecha, hora y cancha. Cada jornada empieza en una semana nueva.
 
-    Devuelve los partidos y los avisos. Lanza ValueError si los partidos no caben.
+    Los partidos se reparten entre los días de juego, respetando cuándo puede jugar cada equipo.
+    Si dos equipos no coinciden en ningún horario, el partido queda sin fecha (fecha None) para
+    programarlo a mano. Devuelve los partidos y los avisos. Lanza ValueError si no caben.
     """
+    disponibilidad = disponibilidad or {}
     if not horario.dias or not horario.canchas or horario.minutos <= 0:
         raise ValueError("Elige al menos un día y una cancha.")
+    semana_modelo = date(2000, 1, 3)  # un lunes, sin restricción de fecha de inicio
+    modelo = list(
+        _espacios_de_la_semana(
+            Horario(semana_modelo, horario.dias, horario.minutos, horario.canchas), semana_modelo
+        )
+    )
+    if not modelo:
+        raise ValueError("Los partidos no caben en el calendario. Agrega días, canchas o más horas.")
+
+    def pueden(local: int, visitante: int, dia: int, hora: int) -> bool:
+        return all(
+            _disponible(disponibilidad.get(e), dia, hora, horario.minutos) for e in (local, visitante)
+        )
 
     por_fecha: dict[date, list[Ocupado]] = {}
     for o in ocupados:
@@ -191,36 +216,49 @@ def programar(
     semanas_usadas = 0
 
     for numero in range(1, total_jornadas + 1):
-        pendientes = _intercalar(
+        pendientes = []
+        for categoria, local, visitante in _intercalar(
             [
                 [(categoria, *p) for p in jornadas[numero - 1]]
                 for categoria, jornadas in jornadas_por_categoria.items()
                 if numero <= len(jornadas)
             ]
-        )
+        ):
+            if any(pueden(local, visitante, f.weekday(), h) for f, h, _ in modelo):
+                pendientes.append((categoria, local, visitante))
+            else:
+                plan.append(
+                    PartidoPlan(categoria, numero, local, visitante, None, None, horario.minutos, None)
+                )
+
         semanas_de_jornada = 0
         while pendientes:
             if semanas_usadas >= SEMANAS_MAXIMAS:
                 raise ValueError(
                     "Los partidos no caben en el calendario. Agrega días, canchas o más horas."
                 )
+            espacios = list(_espacios_de_la_semana(horario, lunes))
             usados_en_semana = False
-            for fecha, hora, cancha in _espacios_de_la_semana(horario, lunes):
-                if not pendientes:
-                    break
-                ya_hay = por_fecha.get(fecha, [])
-                if any(
-                    se_empalman(hora, horario.minutos, cancha, o.hora, o.minutos, o.cancha)
-                    for o in ya_hay
-                ):
+            for partido in list(pendientes):
+                categoria, local, visitante = partido
+                libres = [
+                    (f, h, c)
+                    for f, h, c in espacios
+                    if pueden(local, visitante, f.weekday(), h)
+                    and not any(
+                        se_empalman(h, horario.minutos, c, o.hora, o.minutos, o.cancha)
+                        for o in por_fecha.get(f, [])
+                    )
+                ]
+                if not libres:
                     continue
-                categoria, local, visitante = pendientes.pop(0)
+                # El día con menos partidos gana, para repartirlos entre los días de juego.
+                fecha, hora, cancha = min(libres, key=lambda e: (len(por_fecha.get(e[0], [])), e[0], e[1]))
+                pendientes.remove(partido)
                 plan.append(
                     PartidoPlan(categoria, numero, local, visitante, fecha, hora, horario.minutos, cancha)
                 )
-                por_fecha.setdefault(fecha, []).append(
-                    Ocupado(fecha, hora, horario.minutos, cancha)
-                )
+                por_fecha.setdefault(fecha, []).append(Ocupado(fecha, hora, horario.minutos, cancha))
                 usados_en_semana = True
             lunes += timedelta(days=7)
             semanas_usadas += 1
@@ -306,8 +344,18 @@ def generar(
         raise ValueError("Ninguna categoría elegida tiene al menos 2 equipos.")
 
     plan, avisos_plan = programar(
-        jornadas, horario, _ocupados(conn, (torneo_id, list(jornadas)))
+        jornadas, horario, _ocupados(conn, (torneo_id, list(jornadas))), disponibilidad_de_torneo(conn, torneo_id)
     )
+    nombres_equipos = {
+        e["id"]: e["nombre"]
+        for e in conn.execute("SELECT id, nombre FROM equipos WHERE torneo_id = ?", (torneo_id,))
+    }
+    for p in plan:
+        if p.fecha is None:
+            avisos.append(
+                f"{nombres_equipos[p.local_id]} y {nombres_equipos[p.visitante_id]} no coinciden en ningún "
+                f"horario (jornada {p.jornada}). El partido quedó sin fecha para programarlo a mano."
+            )
     with conn:
         marcas = ",".join("?" * len(jornadas))
         conn.execute(
@@ -320,12 +368,66 @@ def generar(
             [
                 (
                     torneo_id, p.categoria_id, p.jornada, p.local_id, p.visitante_id,
-                    p.fecha.isoformat(), a_hora(p.hora), p.minutos, p.cancha, PROGRAMADO,
+                    p.fecha.isoformat() if p.fecha else None,
+                    a_hora(p.hora) if p.fecha else None,
+                    p.minutos, p.cancha, PROGRAMADO if p.fecha else POR_PROGRAMAR,
                 )
                 for p in plan
             ],
         )
     return len(plan), avisos + avisos_plan
+
+
+def disponibilidad_de_equipo(conn: sqlite3.Connection, equipo_id: int) -> dict[int, tuple[int, int]]:
+    """Días y horas en que puede jugar. Vacío significa que puede siempre."""
+    return {
+        f["dia"]: (f["desde"], f["hasta"])
+        for f in conn.execute("SELECT * FROM disponibilidad WHERE equipo_id = ?", (equipo_id,))
+    }
+
+
+def disponibilidad_de_torneo(conn: sqlite3.Connection, torneo_id: int) -> dict[int, dict[int, tuple[int, int]]]:
+    resultado: dict[int, dict[int, tuple[int, int]]] = {}
+    for f in conn.execute(
+        """SELECT d.* FROM disponibilidad d JOIN equipos e ON e.id = d.equipo_id
+           WHERE e.torneo_id = ?""",
+        (torneo_id,),
+    ):
+        resultado.setdefault(f["equipo_id"], {})[f["dia"]] = (f["desde"], f["hasta"])
+    return resultado
+
+
+def guardar_disponibilidad(
+    conn: sqlite3.Connection, equipo_id: int, dias: dict[int, tuple[int, int]]
+) -> None:
+    """Reemplaza la disponibilidad del equipo. Sin días, queda disponible siempre."""
+    if any(desde >= hasta for desde, hasta in dias.values()):
+        raise ValueError("En cada día, la hora de inicio debe ser menor que la de fin.")
+    with conn:
+        conn.execute("DELETE FROM disponibilidad WHERE equipo_id = ?", (equipo_id,))
+        conn.executemany(
+            "INSERT INTO disponibilidad (equipo_id, dia, desde, hasta) VALUES (?, ?, ?, ?)",
+            [(equipo_id, d, r[0], r[1]) for d, r in dias.items()],
+        )
+
+
+def resumen_disponibilidad(dias: dict[int, tuple[int, int]]) -> str:
+    if not dias:
+        return "Siempre"
+    return ", ".join(DIAS[d][:3] for d in sorted(dias))
+
+
+def equipos_no_disponibles(
+    conn: sqlite3.Connection, fecha: date, hora: int, minutos: int, equipos: list[int]
+) -> list[str]:
+    """Nombres de los equipos que no pueden jugar en ese horario."""
+    nombres = []
+    for equipo in equipos:
+        if not _disponible(disponibilidad_de_equipo(conn, equipo), fecha.weekday(), hora, minutos):
+            nombres.append(
+                conn.execute("SELECT nombre FROM equipos WHERE id = ?", (equipo,)).fetchone()["nombre"]
+            )
+    return nombres
 
 
 def buscar_conflicto(

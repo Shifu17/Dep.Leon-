@@ -31,6 +31,9 @@ computadora, con una cuenta de acceso y código de recuperación.
 - Una categoría con resultados no se puede generar de nuevo, para no perderlos.
 - Portero menos goleado: se lleva **por equipo** (goles recibidos); no se elige portero por partido.
 - Horario de referencia del rol infantil: partidos cada 50 minutos desde las 9:00.
+- Cada equipo puede registrar en qué días y horas puede jugar; sin registro, puede siempre.
+- El rol reparte los partidos entre los días de juego según esa disponibilidad. Si dos equipos no
+  coinciden en ningún horario, el partido queda sin fecha y se avisa para programarlo a mano.
 
 ## Partido no presentado
 
@@ -50,8 +53,12 @@ Al marcar que un equipo no se presentó, quien captura elige una de estas opcion
 
 ## Reportes
 
-PDF para imprimir, imagen para WhatsApp y recibos de pago. El rol de juegos usa las columnas de la
-hoja actual de la liga: Hora, Equipo, Equipo, Categoría y Cancha.
+- En PDF: rol de juegos, tabla de posiciones, goleadores y portería, adeudos y llave de liguilla.
+- En imagen para WhatsApp: rol de juegos, tabla de posiciones y llave de liguilla. Los adeudos no se
+  ofrecen en imagen porque no son para compartir.
+- El rol de juegos usa las columnas de la hoja actual de la liga: Hora, Equipo, Equipo, Categoría y
+  Cancha.
+- Recibos de pago y credenciales en PDF, en sus propias páginas.
 
 ## Fuera de alcance
 
@@ -70,4 +77,4 @@ usuarios.
    la etapa 4.
 4. Cobros: montos, cargos automáticos, abonos, adeudos y recibos. **Hecha.**
 5. Liguilla: rango de clasificados, llave, desempate a elegir y avance automático. **Hecha.**
-6. Reportes.
+6. Reportes en PDF e imagen, con vista previa. **Hecha.**

@@ -98,7 +98,8 @@ class DialogoGenerar(QDialog):
 
         raiz.addWidget(
             QLabel(
-                "Cada jornada se juega en una semana. Si la categoría ya tiene rol, se reemplaza "
+                "Cada jornada se juega en una semana, y los partidos se reparten entre los días según "
+                "la disponibilidad de cada equipo. Si la categoría ya tiene rol, se reemplaza "
                 "por completo, incluidos los cambios hechos a mano y los partidos pospuestos.",
                 objectName="ayuda", wordWrap=True,
             )
@@ -225,6 +226,12 @@ class DialogoPartido(QDialog):
         )
         if conflicto:
             error(self, conflicto)
+            return
+        ausentes = rol.equipos_no_disponibles(self.conn, fecha, hora, minutos, [local, visitante])
+        if ausentes and not confirmar(
+            self,
+            f"{' y '.join(ausentes)} no tiene disponibilidad en ese horario. ¿Guardar de todos modos?",
+        ):
             return
         self.accept()
 

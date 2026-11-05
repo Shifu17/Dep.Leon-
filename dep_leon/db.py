@@ -175,6 +175,13 @@ CREATE TABLE IF NOT EXISTS llaves (
     penales_visitante INTEGER,
     UNIQUE (liguilla_id, ronda, orden)
 );
+CREATE TABLE IF NOT EXISTS disponibilidad (
+    equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+    dia INTEGER NOT NULL CHECK (dia BETWEEN 0 AND 6),
+    desde INTEGER NOT NULL,
+    hasta INTEGER NOT NULL,
+    PRIMARY KEY (equipo_id, dia)
+);
 CREATE TABLE IF NOT EXISTS usuarios (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     usuario TEXT NOT NULL,

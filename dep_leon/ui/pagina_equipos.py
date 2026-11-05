@@ -5,24 +5,27 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
-from PySide6.QtCore import QDate, Qt, Signal
+from PySide6.QtCore import QDate, Qt, QTime, Signal
 from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDateEdit,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QSpinBox,
+    QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
 
-from .. import cobros, credenciales, excel
+from .. import cobros, credenciales, excel, rol
 from ..jugadores import NUMERO_MAX, POSICIONES, borrar_foto, error_de_edad, guardar_foto
 from ..paths import fotos_dir
 from .comun import boton, botones_dialogo, confirmar, error, id_seleccionado, info, llenar, tabla
@@ -50,6 +53,74 @@ class DialogoEquipo(QDialog):
     def _aceptar(self):
         if not self.nombre.text().strip():
             error(self, "Escribe el nombre del equipo.")
+            return
+        self.accept()
+
+
+class DialogoDisponibilidad(QDialog):
+    HORA_INICIO = 8 * 60
+    HORA_FIN = 22 * 60
+
+    def __init__(self, padre, equipo: str, dias: dict[int, tuple[int, int]]):
+        super().__init__(padre)
+        self.setWindowTitle("Disponibilidad del equipo")
+        self.siempre = QCheckBox("Puede jugar cualquier día y a cualquier hora", checked=not dias)
+        self.filas = []
+        rejilla = QGridLayout()
+        rejilla.addWidget(QLabel("Puede jugar"), 0, 0)
+        rejilla.addWidget(QLabel("Desde"), 0, 1)
+        rejilla.addWidget(QLabel("Hasta"), 0, 2)
+        for i, nombre in enumerate(rol.DIAS):
+            desde, hasta = dias.get(i, (self.HORA_INICIO, self.HORA_FIN))
+            casilla = QCheckBox(nombre, checked=i in dias)
+            inicio = QTimeEdit(QTime(desde // 60, desde % 60), displayFormat="HH:mm")
+            fin = QTimeEdit(QTime(hasta // 60, hasta % 60), displayFormat="HH:mm")
+            self.filas.append((i, casilla, inicio, fin))
+            rejilla.addWidget(casilla, i + 1, 0)
+            rejilla.addWidget(inicio, i + 1, 1)
+            rejilla.addWidget(fin, i + 1, 2)
+            casilla.toggled.connect(self._actualizar)
+        self.siempre.toggled.connect(self._actualizar)
+
+        raiz = QVBoxLayout(self)
+        raiz.addWidget(QLabel(equipo, objectName="seccion"))
+        raiz.addWidget(self.siempre)
+        raiz.addLayout(rejilla)
+        raiz.addWidget(
+            QLabel(
+                "El rol automático solo programa a este equipo en estos horarios.",
+                objectName="ayuda", wordWrap=True,
+            )
+        )
+        raiz.addWidget(botones_dialogo(self, self._aceptar))
+        self._actualizar()
+
+    def _actualizar(self):
+        libre = not self.siempre.isChecked()
+        for _, casilla, inicio, fin in self.filas:
+            casilla.setEnabled(libre)
+            inicio.setEnabled(libre and casilla.isChecked())
+            fin.setEnabled(libre and casilla.isChecked())
+
+    def valores(self) -> dict[int, tuple[int, int]]:
+        if self.siempre.isChecked():
+            return {}
+        return {
+            i: (
+                inicio.time().hour() * 60 + inicio.time().minute(),
+                fin.time().hour() * 60 + fin.time().minute(),
+            )
+            for i, casilla, inicio, fin in self.filas
+            if casilla.isChecked()
+        }
+
+    def _aceptar(self):
+        valores = self.valores()
+        if not self.siempre.isChecked() and not valores:
+            error(self, "Marca al menos un día, o la opción de cualquier día.")
+            return
+        if any(desde >= hasta for desde, hasta in valores.values()):
+            error(self, "En cada día, la hora «desde» debe ser menor que la hora «hasta».")
             return
         self.accept()
 
@@ -200,7 +271,7 @@ class PaginaEquipos(QWidget):
         excel_fila.addWidget(boton("Importar Excel", self.importar_excel))
         excel_fila.addStretch(1)
 
-        self.tabla_equipos = tabla(["Equipo", "Categoría", "Jugadores"], estirar=0)
+        self.tabla_equipos = tabla(["Equipo", "Categoría", "Jugadores", "Disponible"], estirar=0)
         self.tabla_jugadores = tabla(["Núm.", "Jugador", "Nacimiento", "Posición", "Foto"], estirar=1)
         self.tabla_equipos.itemSelectionChanged.connect(self.refrescar_jugadores)
 
@@ -211,6 +282,7 @@ class PaginaEquipos(QWidget):
         fila.addWidget(boton("Agregar", self.nuevo_equipo))
         fila.addWidget(boton("Editar", self.editar_equipo, "secundario"))
         fila.addWidget(boton("Eliminar", self.borrar_equipo, "peligro"))
+        fila.addWidget(boton("Disponibilidad", self.editar_disponibilidad, "secundario"))
         izquierda.addLayout(fila)
 
         derecha = QVBoxLayout()
@@ -290,7 +362,19 @@ class PaginaEquipos(QWidget):
                GROUP BY e.id ORDER BY c.nombre, e.nombre""",
             (self._torneo_id(), self.categoria.currentData(), self.categoria.currentData()),
         )
-        llenar(self.tabla_equipos, [(f["id"], [f["nombre"], f["categoria"], f["total"]]) for f in filas])
+        llenar(
+            self.tabla_equipos,
+            [
+                (
+                    f["id"],
+                    [
+                        f["nombre"], f["categoria"], f["total"],
+                        rol.resumen_disponibilidad(rol.disponibilidad_de_equipo(self.conn, f["id"])),
+                    ],
+                )
+                for f in filas
+            ],
+        )
         self.refrescar_jugadores()
 
     def refrescar_jugadores(self):
@@ -364,6 +448,17 @@ class PaginaEquipos(QWidget):
             error(self, "Ya existe un equipo con ese nombre en esa categoría.")
             return
         self._avisar_cambio()
+
+    def editar_disponibilidad(self):
+        equipo_id = id_seleccionado(self.tabla_equipos)
+        if equipo_id is None:
+            error(self, "Primero selecciona un equipo.")
+            return
+        nombre = self.tabla_equipos.item(self.tabla_equipos.currentRow(), 0).text()
+        dialogo = DialogoDisponibilidad(self, nombre, rol.disponibilidad_de_equipo(self.conn, equipo_id))
+        if dialogo.exec():
+            rol.guardar_disponibilidad(self.conn, equipo_id, dialogo.valores())
+            self._avisar_cambio()
 
     def borrar_equipo(self):
         equipo_id = id_seleccionado(self.tabla_equipos)
