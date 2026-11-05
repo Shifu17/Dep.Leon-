@@ -18,6 +18,13 @@ conviene seguirlos en orden la primera vez.
 11. [Atajos y búsqueda](#11-atajos-y-búsqueda)
 12. [Si algo no sale](#12-si-algo-no-sale)
 
+## 0. La pantalla de Inicio
+
+Inicio muestra la fecha de hoy y, debajo de las cifras de la liga, una lista de **pendientes**: partidos
+por capturar, partidos sin fecha, dinero por cobrar o el siguiente paso si apenas empiezas. Cada pendiente
+tiene un botón que te lleva a resolverlo. Más abajo están los próximos juegos, los equipos que juegan el
+próximo día y los líderes de cada categoría.
+
 ## 1. Entrar al programa
 
 ![Pantalla de inicio de sesión](img/inicio_de_sesion.png)
@@ -46,11 +53,11 @@ Entra a **Equipos y jugadores** y elige liga y torneo. Hay dos formas de registr
 
 ### Desde Excel (recomendado para muchos jugadores)
 
-1. Pulsa **Descargar plantilla de Excel**. La hoja **Instrucciones** explica cómo llenarla.
+1. Pulsa **Excel** y elige **Descargar plantilla**. La hoja **Instrucciones** explica cómo llenarla.
 2. Captura un jugador por renglón en la hoja **Jugadores**.
 3. Si hay fotos, ponlas en la misma carpeta que el Excel o en una subcarpeta `fotos`, y escribe el nombre
    del archivo en la columna **Foto**.
-4. Guarda, cierra el archivo y pulsa **Importar Excel**.
+4. Guarda, cierra el archivo, pulsa **Excel** y elige **Importar jugadores**.
 5. Revisa la vista previa: los renglones con error salen en rojo y no se registran. Corrígelos en Excel y
    vuelve a importar; los jugadores ya registrados se actualizan, no se duplican.
 
@@ -63,8 +70,11 @@ Agrega el equipo y, con el equipo seleccionado, agrega cada jugador.
 
 ### Otras acciones del equipo
 
-- **Credenciales PDF:** genera las credenciales del equipo seleccionado, 8 por hoja.
+En **Más**, con el equipo seleccionado:
+
 - **Disponibilidad:** indica qué días y horas puede jugar. Si no marcas nada, puede jugar siempre.
+- **Credenciales PDF:** genera las credenciales del equipo, 8 por hoja.
+- **Eliminar equipo**.
 
 ## 4. Generar el rol de juegos
 
@@ -85,7 +95,8 @@ El programa arma las jornadas y:
 Si dos equipos no coinciden en ningún horario, te avisa y deja su partido **sin fecha** para que lo
 programes a mano.
 
-Después puedes **Agregar partido**, **Editar o reprogramar**, **Posponer** o **Eliminar**. Un partido
+Después puedes **Agregar partido** o **Editar o reprogramar**; en **Más** están **Posponer partido** y
+**Eliminar partido**. Un partido
 pospuesto o sin coincidencia de horarios aparece como **Sin fecha** hasta que le asignes una.
 
 > **Antes de generar de nuevo:** se borra el rol anterior de esas categorías, incluidos los cambios a mano
@@ -129,7 +140,8 @@ En **Liguilla**, elige torneo y categoría:
 1. Indica el rango: **Clasifican del lugar X al lugar Y**.
 2. Elige **Si empatan**: penales o mejor lugar en la tabla.
 3. Pulsa **Crear liguilla**.
-4. Selecciona cada partido de la llave para programarlo y capturar su resultado.
+4. Selecciona cada partido de la llave para programarlo y capturar su resultado. En **Más** están
+   **No se presentó un equipo**, **Borrar resultado** y **Eliminar liguilla**.
 
 Si los clasificados no completan 2, 4, 8 o 16 equipos, los mejores lugares pasan directo a la siguiente
 ronda. El ganador avanza solo hasta llegar al campeón.

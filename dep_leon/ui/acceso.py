@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from .. import acceso
 from ..paths import asset
-from .comun import botones_dialogo, error, info
+from .comun import AvisoCampo, botones_dialogo, error, info
 
 MAX_INTENTOS = 5
 ESPERA_SEGUNDOS = 30
@@ -162,6 +162,8 @@ class DialogoAcceso(QDialog):
             )
         )
         raiz.addLayout(forma)
+        self.aviso_crear = AvisoCampo()
+        raiz.addWidget(self.aviso_crear)
         raiz.addWidget(_boton("Crear cuenta", self.crear))
         raiz.addStretch(1)
         return pagina
@@ -230,14 +232,15 @@ class DialogoAcceso(QDialog):
 
     def crear(self):
         if self.nueva_contrasena.text() != self.confirmacion.text():
-            error(self, "Las contraseñas no coinciden.")
+            self.aviso_crear.mostrar("Las contraseñas no coinciden.")
+            self.confirmacion.setFocus()
             return
         try:
             codigo = acceso.crear_cuenta(
                 self.conn, self.nuevo_usuario.text(), self.nueva_contrasena.text()
             )
         except ValueError as exc:
-            error(self, str(exc))
+            self.aviso_crear.mostrar(str(exc))
             return
         DialogoCodigo(self, codigo).exec()
         self.accept()
@@ -301,16 +304,18 @@ class DialogoCambiarContrasena(QDialog):
         forma.addRow("Contraseña actual:", self.actual)
         forma.addRow("Contraseña nueva:", self.nueva)
         forma.addRow("Repítela:", self.confirmacion)
+        self.aviso = AvisoCampo()
+        forma.addRow(self.aviso)
         forma.addRow(botones_dialogo(self, self._aceptar))
 
     def _aceptar(self):
         if self.nueva.text() != self.confirmacion.text():
-            error(self, "Las contraseñas nuevas no coinciden.")
+            self.aviso.mostrar("Las contraseñas nuevas no coinciden.")
             return
         try:
             acceso.cambiar_contrasena(self.conn, self.actual.text(), self.nueva.text())
         except ValueError as exc:
-            error(self, str(exc))
+            self.aviso.mostrar(str(exc))
             return
         info(self, "Contraseña cambiada.")
         self.accept()

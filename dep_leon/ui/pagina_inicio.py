@@ -1,4 +1,8 @@
-"""Pantalla de inicio: números de la liga, próximos juegos y equipos por jugar."""
+"""Inicio: qué requiere atención hoy, el próximo día de juego y cómo va cada categoría.
+
+El orden responde a lo que se hace al abrir el programa: primero lo pendiente, con un botón que
+lleva a resolverlo; luego lo que viene; al final, el panorama de la liga.
+"""
 
 import sqlite3
 from datetime import date
@@ -12,144 +16,175 @@ from PySide6.QtWidgets import (
     QLabel,
     QSizePolicy,
     QTableWidget,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from .. import estadisticas, inicio, rol
+from .. import cobros, estadisticas, inicio, rol
 from .comun import boton, etiqueta, llenar, tabla
 
 
-def _solo_lectura(columnas: list[str], estirar: int, ordenable: bool = False) -> QTableWidget:
-    resultado = tabla(columnas, estirar=estirar, ordenable=ordenable)
+def _solo_lectura(columnas: list[str], estirar: int) -> QTableWidget:
+    resultado = tabla(columnas, estirar=estirar, ordenable=False)
     resultado.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
     resultado.setFocusPolicy(Qt.FocusPolicy.NoFocus)
     return resultado
 
 
-class Tarjeta(QFrame):
+class Dato(QWidget):
+    """Una cifra con su nombre, para la franja de resumen."""
+
     def __init__(self, texto: str):
-        super().__init__(objectName="tarjeta")
-        self.numero = QLabel("0", objectName="tarjetaNumero")
+        super().__init__()
+        self.numero = QLabel("0", objectName="datoNumero")
         columna = QVBoxLayout(self)
-        columna.setContentsMargins(16, 10, 16, 10)
+        columna.setContentsMargins(14, 8, 14, 8)
         columna.setSpacing(0)
         columna.addWidget(self.numero)
-        columna.addWidget(QLabel(texto, objectName="tarjetaTexto"))
+        columna.addWidget(QLabel(texto, objectName="datoTexto"))
 
     def poner(self, valor: int, alerta: bool = False):
         self.numero.setText(f"{valor:,}")
-        nombre = "tarjetaAlerta" if alerta else "tarjetaNumero"
+        nombre = "datoAlerta" if alerta else "datoNumero"
         if self.numero.objectName() != nombre:
             self.numero.setObjectName(nombre)
             self.numero.style().unpolish(self.numero)
             self.numero.style().polish(self.numero)
 
 
+class Pendiente(QFrame):
+    """Un renglón de la lista de pendientes: qué pasa y el botón para resolverlo."""
+
+    def __init__(self, texto_boton: str, accion, alerta: bool = False):
+        super().__init__(objectName="pendienteAlerta" if alerta else "pendiente")
+        self.texto = QLabel(wordWrap=True)
+        fila = QHBoxLayout(self)
+        fila.setContentsMargins(12, 6, 8, 6)
+        fila.addWidget(self.texto, 1)
+        fila.addWidget(boton(texto_boton, accion, None if alerta else "secundario"))
+        self.setVisible(False)
+
+    def mostrar(self, texto: str | None):
+        self.texto.setText(texto or "")
+        self.setVisible(bool(texto))
+
+
 class PaginaInicio(QWidget):
-    ir_a_capturar = Signal(int, int)  # liga y torneo del partido atrasado más antiguo
+    ir_a = Signal(str, object, object)  # pantalla, liga y torneo a los que conviene ir
 
     def __init__(self, conn: sqlite3.Connection):
         super().__init__()
         self.setObjectName("pagina")
         self.conn = conn
+        self._destinos: dict[str, tuple] = {}
 
+        self.titulo = QLabel(objectName="titulo")
+        self.titulo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.liga = QComboBox()
-        self.liga.setMinimumWidth(220)
+        self.liga.setMinimumWidth(200)
         self.liga.currentIndexChanged.connect(self.refrescar_datos)
         encabezado = QHBoxLayout()
-        titulo = QLabel("Inicio", objectName="titulo")
-        titulo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        encabezado.addWidget(titulo, 1)
+        encabezado.addWidget(self.titulo, 1)
         encabezado.addWidget(etiqueta("Ver:", self.liga))
         encabezado.addWidget(self.liga)
 
-        self.equipos = Tarjeta("Equipos")
-        self.jugadores = Tarjeta("Jugadores")
-        self.por_jugar = Tarjeta("Partidos por jugar")
-        self.por_capturar = Tarjeta("Por capturar")
-        self.jugados = Tarjeta("Partidos jugados")
-        self.pospuestos = Tarjeta("Partidos pospuestos")
-        tarjetas = QHBoxLayout()
-        for tarjeta in (
-            self.equipos, self.jugadores, self.por_jugar, self.por_capturar, self.jugados, self.pospuestos,
-        ):
-            tarjetas.addWidget(tarjeta)
+        self.equipos = Dato("Equipos")
+        self.jugadores = Dato("Jugadores")
+        self.por_jugar = Dato("Por jugar")
+        self.por_capturar = Dato("Por capturar")
+        self.jugados = Dato("Jugados")
+        self.pospuestos = Dato("Pospuestos")
+        franja = QFrame(objectName="franja")
+        fila_franja = QHBoxLayout(franja)
+        fila_franja.setContentsMargins(4, 0, 4, 0)
+        fila_franja.setSpacing(0)
+        datos = (self.equipos, self.jugadores, self.por_jugar, self.por_capturar, self.jugados, self.pospuestos)
+        for i, dato in enumerate(datos):
+            if i:
+                separador = QFrame(objectName="separador")
+                separador.setFixedWidth(1)
+                fila_franja.addWidget(separador)
+            fila_franja.addWidget(dato, 1)
 
-        self.aviso = QFrame(objectName="avisoAtrasados")
-        self.aviso_texto = QLabel()
-        fila_aviso = QHBoxLayout(self.aviso)
-        fila_aviso.setContentsMargins(12, 6, 8, 6)
-        fila_aviso.addWidget(self.aviso_texto, 1)
-        fila_aviso.addWidget(boton("Capturar resultados", self._capturar))
-        self.aviso.setVisible(False)
+        self.aviso = Pendiente("Capturar resultados", lambda: self._ir("resultados"), alerta=True)
+        self.aviso_texto = self.aviso.texto
+        self.pendiente_fecha = Pendiente("Ver en el rol", lambda: self._ir("rol"))
+        self.pendiente_cobro = Pendiente("Ir a cobros", lambda: self._ir("cobros"))
+        self.pendiente_paso = Pendiente("Empezar", lambda: self._ir("paso"))
+        self.al_dia = QLabel("Todo al día: no hay partidos por capturar ni sin fecha.", objectName="ayuda")
+        pendientes = QVBoxLayout()
+        pendientes.setSpacing(4)
+        for renglon in (self.pendiente_paso, self.aviso, self.pendiente_fecha, self.pendiente_cobro):
+            pendientes.addWidget(renglon)
+        pendientes.addWidget(self.al_dia)
 
-        self.proximos = _solo_lectura(
-            ["Día", "Hora", "Equipo", "Equipo", "Categoría", "Cancha"], estirar=2
-        )
+        self.proximos = _solo_lectura(["Día", "Hora", "Equipo", "Equipo", "Categoría", "Cancha"], estirar=2)
         self.proximos.horizontalHeader().setSectionResizeMode(
             3, self.proximos.horizontalHeader().ResizeMode.Stretch
         )
         self.sin_proximos = QLabel(
             "No hay juegos programados. Créalos en «Rol de juegos».", objectName="ayuda", wordWrap=True
         )
-        izquierda = QVBoxLayout()
-        izquierda.addWidget(QLabel("Próximos juegos", objectName="seccion"))
-        izquierda.addWidget(self.sin_proximos)
-        izquierda.addWidget(self.proximos, 1)
+        pestana_proximos = QWidget()
+        columna = QVBoxLayout(pestana_proximos)
+        columna.setContentsMargins(0, 6, 0, 0)
+        columna.addWidget(self.sin_proximos)
+        columna.addWidget(self.proximos, 1)
 
-        self.titulo_equipos = QLabel("Equipos por jugar", objectName="seccion")
+        self.titulo_equipos = QLabel("Equipos por jugar", objectName="ayuda", wordWrap=True)
         self.equipos_jugar = _solo_lectura(["Hora", "Equipo", "Contra", "Categoría"], estirar=1)
         self.sin_equipos = QLabel(
             "Aquí verás los equipos del próximo día de juego.", objectName="ayuda", wordWrap=True
         )
-        derecha = QVBoxLayout()
-        derecha.addWidget(self.titulo_equipos)
-        derecha.addWidget(self.sin_equipos)
-        derecha.addWidget(self.equipos_jugar, 1)
+        pestana_equipos = QWidget()
+        columna = QVBoxLayout(pestana_equipos)
+        columna.setContentsMargins(0, 6, 0, 0)
+        columna.addWidget(self.titulo_equipos)
+        columna.addWidget(self.sin_equipos)
+        columna.addWidget(self.equipos_jugar, 1)
 
-        columnas = QHBoxLayout()
-        columnas.addLayout(izquierda, 3)
-        columnas.addLayout(derecha, 2)
-
-        self.ligas = _solo_lectura(
-            ["Liga", "Equipos", "Por jugar", "Por capturar", "Jugados", "Pospuestos"],
-            estirar=0,
-        )
-        self.ligas.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        abajo_izquierda = QVBoxLayout()
-        abajo_izquierda.addWidget(QLabel("Resumen por liga", objectName="seccion"))
-        abajo_izquierda.addWidget(self.ligas)
-        abajo_izquierda.addStretch(1)
+        self.pestanas = QTabWidget()
+        self.pestanas.addTab(pestana_proximos, "Próximos juegos")
+        self.pestanas.addTab(pestana_equipos, "Equipos por jugar")
 
         self.lideres = _solo_lectura(["Categoría", "Líder", "Pts", "Goleador", "Goles"], estirar=3)
         self.sin_lideres = QLabel(
             "Aquí verás al líder y al goleador de cada categoría cuando captures resultados.",
             objectName="ayuda", wordWrap=True,
         )
-        abajo_derecha = QVBoxLayout()
-        abajo_derecha.addWidget(QLabel("Líderes por categoría", objectName="seccion"))
-        abajo_derecha.addWidget(self.sin_lideres)
-        abajo_derecha.addWidget(self.lideres)
-        abajo_derecha.addStretch(1)
+        self.ligas = _solo_lectura(["Liga", "Equipos", "Por jugar", "Por capturar"], estirar=0)
+        self.titulo_resumen = QLabel("Resumen por liga", objectName="seccion")
 
-        abajo = QHBoxLayout()
-        abajo.addLayout(abajo_izquierda, 3)
-        abajo.addLayout(abajo_derecha, 2)
+        derecha = QVBoxLayout()
+        derecha.addWidget(QLabel("Líderes por categoría", objectName="seccion"))
+        derecha.addWidget(self.sin_lideres)
+        derecha.addWidget(self.lideres, 1)
+        derecha.addWidget(self.titulo_resumen)
+        derecha.addWidget(self.ligas, 1)
+        derecha.addStretch(0)
+        for aviso in (self.sin_proximos, self.sin_equipos, self.sin_lideres):
+            aviso.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
+        cuerpo = QHBoxLayout()
+        cuerpo.addWidget(self.pestanas, 3)
+        cuerpo.addLayout(derecha, 2)
 
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
         raiz.addLayout(encabezado)
-        raiz.addLayout(tarjetas)
-        raiz.addWidget(self.aviso)
-        raiz.addLayout(columnas, 1)
-        raiz.addLayout(abajo)
+        raiz.addWidget(franja)
+        raiz.addLayout(pendientes)
+        raiz.addLayout(cuerpo, 1)
         self.refrescar()
 
-    def _capturar(self):
-        destino = inicio.primer_atrasado(self.conn, rol.hoy(), self.liga.currentData())
+    def _ir(self, clave: str):
+        destino = self._destinos.get(clave)
         if destino:
-            self.ir_a_capturar.emit(*destino)
+            self.ir_a.emit(*destino)
+
+    def _capturar(self):
+        self._ir("resultados")
 
     def showEvent(self, evento):
         # Los datos pueden cambiar en cualquier página, así que se leen al volver aquí.
@@ -170,21 +205,17 @@ class PaginaInicio(QWidget):
     def refrescar_datos(self):
         hoy = rol.hoy()
         liga_id = self.liga.currentData()
+        self.titulo.setText(rol.fecha_larga(hoy))
         resumen = inicio.resumen_por_liga(self.conn, hoy)
         elegidas = [r for r in resumen if liga_id is None or r.liga_id == liga_id]
+        atrasados = sum(r.por_capturar for r in elegidas)
         self.equipos.poner(sum(r.equipos for r in elegidas))
         self.jugadores.poner(sum(r.jugadores for r in elegidas))
         self.por_jugar.poner(sum(r.por_jugar for r in elegidas))
-        atrasados = sum(r.por_capturar for r in elegidas)
         self.por_capturar.poner(atrasados, alerta=atrasados > 0)
-        self.aviso_texto.setText(
-            "1 partido ya pasó y no tiene resultado."
-            if atrasados == 1
-            else f"{atrasados} partidos ya pasaron y no tienen resultado."
-        )
-        self.aviso.setVisible(atrasados > 0)
         self.jugados.poner(sum(r.jugados for r in elegidas))
         self.pospuestos.poner(sum(r.pospuestos for r in elegidas))
+        self._refrescar_pendientes(hoy, liga_id, atrasados)
 
         partidos = inicio.proximos_partidos(self.conn, hoy, liga_id)
         llenar(
@@ -209,27 +240,10 @@ class PaginaInicio(QWidget):
         )
         llenar(
             self.equipos_jugar,
-            [
-                (i, [e["hora"], e["equipo"], e["rival"], e["categoria"]])
-                for i, e in enumerate(equipos)
-            ],
+            [(i, [e["hora"], e["equipo"], e["rival"], e["categoria"]]) for i, e in enumerate(equipos)],
         )
         self.equipos_jugar.setVisible(bool(equipos))
         self.sin_equipos.setVisible(not equipos)
-
-        llenar(
-            self.ligas,
-            [
-                (
-                    r.liga_id,
-                    [
-                        r.nombre, r.equipos, r.por_jugar, r.por_capturar, r.jugados, r.pospuestos,
-                    ],
-                )
-                for r in resumen
-            ],
-        )
-        self._ajustar_alto(self.ligas)
 
         lideres = estadisticas.lideres(self.conn, liga_id)
         llenar(
@@ -241,11 +255,52 @@ class PaginaInicio(QWidget):
         )
         self.lideres.setVisible(bool(lideres))
         self.sin_lideres.setVisible(not lideres)
-        self.lideres.setFixedHeight(self.ligas.height())
 
-    @staticmethod
-    def _ajustar_alto(tabla_: QTableWidget):
-        tabla_.resizeRowsToContents()
-        alto = tabla_.horizontalHeader().height() + 2
-        alto += sum(tabla_.rowHeight(f) for f in range(tabla_.rowCount()))
-        tabla_.setFixedHeight(alto)
+        # Las ligas sin equipos no aportan nada, y con una sola liga el resumen repite la franja de arriba.
+        con_equipos = [r for r in resumen if r.equipos]
+        llenar(
+            self.ligas,
+            [(r.liga_id, [r.nombre, r.equipos, r.por_jugar, r.por_capturar]) for r in con_equipos],
+        )
+        comparar = liga_id is None and len(con_equipos) >= 2
+        self.ligas.setVisible(comparar)
+        self.titulo_resumen.setVisible(comparar)
+
+    def _refrescar_pendientes(self, hoy: date, liga_id, atrasados: int):
+        self._destinos.clear()
+        paso = inicio.siguiente_paso(self.conn, liga_id)
+        if paso:
+            pantalla, texto, etiqueta_boton = paso
+            self._destinos["paso"] = (pantalla, liga_id, None)
+            self.pendiente_paso.findChild(type(boton("", lambda: None))).setText(etiqueta_boton)
+        self.pendiente_paso.mostrar(paso[1] if paso else None)
+
+        destino = inicio.primer_atrasado(self.conn, hoy, liga_id)
+        if destino:
+            self._destinos["resultados"] = ("resultados", *destino)
+        self.aviso.mostrar(
+            None
+            if not atrasados
+            else "1 partido ya pasó y no tiene resultado."
+            if atrasados == 1
+            else f"{atrasados} partidos ya pasaron y no tienen resultado."
+        )
+
+        sin_fecha, destino = inicio.sin_fecha(self.conn, liga_id)
+        if destino:
+            self._destinos["rol"] = ("rol", *destino)
+        self.pendiente_fecha.mostrar(
+            None
+            if not sin_fecha
+            else "1 partido no tiene fecha (pospuesto o sin horario en común)."
+            if sin_fecha == 1
+            else f"{sin_fecha} partidos no tienen fecha (pospuestos o sin horario en común)."
+        )
+
+        pendiente, destino = inicio.por_cobrar(self.conn, liga_id)
+        if destino:
+            self._destinos["cobros"] = ("cobros", *destino)
+        self.pendiente_cobro.mostrar(
+            f"Hay {cobros.dinero(pendiente)} por cobrar en inscripciones y arbitrajes." if pendiente else None
+        )
+        self.al_dia.setVisible(not (paso or atrasados or sin_fecha))

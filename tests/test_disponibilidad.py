@@ -190,13 +190,13 @@ def test_dialogo_disponibilidad(ventana):
     ui_equipos.error = lambda _, m: errores.append(m)
     try:
         dialogo._aceptar()
-        assert "al menos un día" in errores[0] and dialogo.result() == 0
+        assert "al menos un día" in dialogo.aviso.text() and dialogo.result() == 0
 
         dialogo.filas[VIE][1].setChecked(True)
         dialogo.filas[VIE][2].setTime(QTime(16, 0))
         dialogo.filas[VIE][3].setTime(QTime(15, 0))
         dialogo._aceptar()
-        assert "menor" in errores[1] and dialogo.result() == 0
+        assert "menor" in dialogo.aviso.text() and dialogo.result() == 0
 
         dialogo.filas[VIE][3].setTime(QTime(19, 0))
         dialogo._aceptar()

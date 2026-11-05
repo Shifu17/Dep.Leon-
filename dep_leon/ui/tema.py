@@ -43,6 +43,35 @@ QLabel#titulo {{
 QLabel#tituloAcceso {{ color: {VERDE_ACTIVO}; font-size: 24px; font-weight: 600; }}
 QFrame#tarjeta {{ background: {BLANCO}; border: 1px solid {BORDE}; border-radius: 8px; }}
 QLabel#tarjetaNumero {{ color: {TEXTO}; font-size: 30px; font-weight: 600; }}
+QFrame#franja {{ background: {BLANCO}; border: 1px solid {BORDE}; border-radius: 8px; }}
+QFrame#separador {{ background: {BORDE}; margin: 10px 0; }}
+QLabel#datoNumero {{ color: {TEXTO}; font-size: 22px; font-weight: 600; }}
+QLabel#datoAlerta {{ color: {ROJO}; font-size: 22px; font-weight: 600; }}
+QLabel#datoTexto {{ color: {TEXTO_SUAVE}; }}
+QFrame#pendiente {{ background: {BLANCO}; border: 1px solid {BORDE}; border-radius: 6px; }}
+QFrame#pendienteAlerta {{ background: {ROJO_SUAVE}; border: 1px solid {BORDE_PELIGRO}; border-radius: 6px; }}
+QLabel#vacio {{ color: {TEXTO_SUAVE}; background: transparent; }}
+QLabel#errorCampo {{ color: {ROJO}; }}
+QLineEdit[invalido="true"], QComboBox[invalido="true"], QSpinBox[invalido="true"],
+QDoubleSpinBox[invalido="true"], QDateEdit[invalido="true"], QTimeEdit[invalido="true"] {{
+    border: 2px solid {ROJO}; padding: 4px;
+}}
+QPushButton#mas {{ padding-right: 26px; }}
+QPushButton#mas::menu-indicator {{
+    image: url("{FLECHA}"); width: 9px; height: 6px;
+    subcontrol-origin: padding; subcontrol-position: right center; right: 9px;
+}}
+QMenu {{ background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE_CONTROL}; padding: 4px; }}
+QMenu::item {{ padding: 6px 18px; border-radius: 4px; }}
+QMenu::item:selected {{ background: {VERDE_SUAVE}; color: {TEXTO}; }}
+QTabWidget::pane {{ border: none; }}
+QTabBar::tab {{
+    background: transparent; color: {TEXTO_SUAVE}; padding: 6px 14px; margin-right: 4px;
+    border: none; border-bottom: 2px solid transparent; font-weight: 600;
+}}
+QTabBar::tab:selected {{ color: {VERDE_ACTIVO}; border-bottom: 2px solid {VERDE}; }}
+QTabBar::tab:hover {{ color: {TEXTO}; }}
+QTabBar:focus {{ border: 1px solid {BARRA}; border-radius: 4px; }}
 QLabel#tarjetaAlerta {{ color: {ROJO}; font-size: 30px; font-weight: 600; }}
 QFrame#avisoAtrasados {{ background: {ROJO_SUAVE}; border: 1px solid {BORDE_PELIGRO}; border-radius: 6px; }}
 QLabel#tarjetaTexto {{ color: {TEXTO_SUAVE}; }}
@@ -91,10 +120,10 @@ QPushButton:hover {{ background: {VERDE_ACTIVO}; border-color: {VERDE_ACTIVO}; }
 QPushButton:pressed {{ background: {BARRA}; border-color: {BARRA}; }}
 QPushButton:focus {{ border: 2px solid {BARRA}; padding: 6px 13px; }}
 QPushButton:disabled {{ background: #BCCBC2; border-color: #BCCBC2; color: #46564D; }}
-QPushButton#secundario {{ background: {BLANCO}; color: {VERDE_ACTIVO}; border: 1px solid {BORDE_CONTROL}; }}
-QPushButton#secundario:hover {{ background: {VERDE_SUAVE}; border-color: {VERDE_ACTIVO}; }}
-QPushButton#secundario:pressed {{ background: {VERDE_SUAVE}; }}
-QPushButton#secundario:focus {{ border: 2px solid {BARRA}; padding: 6px 13px; }}
+QPushButton#secundario, QPushButton#mas {{ background: {BLANCO}; color: {VERDE_ACTIVO}; border: 1px solid {BORDE_CONTROL}; }}
+QPushButton#secundario:hover, QPushButton#mas:hover {{ background: {VERDE_SUAVE}; border-color: {VERDE_ACTIVO}; }}
+QPushButton#secundario:pressed, QPushButton#mas:pressed {{ background: {VERDE_SUAVE}; }}
+QPushButton#secundario:focus, QPushButton#mas:focus {{ border: 2px solid {BARRA}; padding: 6px 13px; }}
 QPushButton#peligro {{ background: {BLANCO}; color: {ROJO}; border: 1px solid {BORDE_PELIGRO}; }}
 QPushButton#peligro:hover {{ background: {ROJO_SUAVE}; border-color: {ROJO}; }}
 QPushButton#peligro:pressed {{ background: {ROJO_SUAVE}; }}

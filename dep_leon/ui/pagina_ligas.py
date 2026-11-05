@@ -17,7 +17,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .comun import al_activar, boton, botones_dialogo, confirmar, error, id_seleccionado, llenar, tabla
+from .comun import (
+    al_activar,
+    boton,
+    botones_dialogo,
+    confirmar,
+    error,
+    fila_con_error,
+    id_seleccionado,
+    llenar,
+    poner_vacio,
+    tabla,
+)
 
 MODALIDADES = ["Fut 7", "Fut 11"]
 
@@ -34,14 +45,14 @@ class DialogoLiga(QDialog):
         if liga:
             self.modalidad.setCurrentText(liga["modalidad"])
         forma = QFormLayout(self)
-        forma.addRow("Nombre:", self.nombre)
+        self.error_nombre = fila_con_error(forma, "Nombre:", self.nombre)
         forma.addRow("Modalidad:", self.modalidad)
         forma.addRow("Días de juego:", self.dias)
         forma.addRow(botones_dialogo(self, self._aceptar))
 
     def _aceptar(self):
         if not self.nombre.text().strip():
-            error(self, "Escribe el nombre de la liga.")
+            self.error_nombre.mostrar("Escribe el nombre de la liga.")
             return
         self.accept()
 
@@ -68,10 +79,10 @@ class DialogoCategoria(QDialog):
                 self.anio_max.setValue(categoria["anio_max"])
         self.sin_limite.toggled.connect(self._actualizar)
         forma = QFormLayout(self)
-        forma.addRow("Nombre:", self.nombre)
+        self.error_nombre = fila_con_error(forma, "Nombre:", self.nombre)
         forma.addRow(self.sin_limite)
         forma.addRow("Nacidos desde:", self.anio_min)
-        forma.addRow("Nacidos hasta:", self.anio_max)
+        self.error_anios = fila_con_error(forma, "Nacidos hasta:", self.anio_max)
         forma.addRow(botones_dialogo(self, self._aceptar))
         self._actualizar()
 
@@ -82,10 +93,10 @@ class DialogoCategoria(QDialog):
 
     def _aceptar(self):
         if not self.nombre.text().strip():
-            error(self, "Escribe el nombre de la categoría.")
+            self.error_nombre.mostrar("Escribe el nombre de la categoría.")
             return
         if not self.sin_limite.isChecked() and self.anio_min.value() > self.anio_max.value():
-            error(self, "El año «desde» no puede ser mayor que el año «hasta».")
+            self.error_anios.mostrar("El año «desde» no puede ser mayor que el año «hasta».")
             return
         self.accept()
 
@@ -102,12 +113,12 @@ class DialogoTorneo(QDialog):
         self.nombre = QLineEdit(torneo["nombre"] if torneo else "")
         self.nombre.setPlaceholderText("Ejemplo: Copa de Verano")
         forma = QFormLayout(self)
-        forma.addRow("Nombre:", self.nombre)
+        self.error_nombre = fila_con_error(forma, "Nombre:", self.nombre)
         forma.addRow(botones_dialogo(self, self._aceptar))
 
     def _aceptar(self):
         if not self.nombre.text().strip():
-            error(self, "Escribe el nombre del torneo.")
+            self.error_nombre.mostrar("Escribe el nombre del torneo.")
             return
         self.accept()
 
@@ -128,6 +139,8 @@ class PaginaLigas(QWidget):
         al_activar(self.tabla_ligas, self.editar_liga)
         al_activar(self.tabla_categorias, self.editar_categoria)
         al_activar(self.tabla_torneos, self.editar_torneo)
+        poner_vacio(self.tabla_categorias, "Esta liga no tiene categorías. Pulsa «Agregar» debajo de esta lista.")
+        poner_vacio(self.tabla_torneos, "Esta liga no tiene torneos. Pulsa «Agregar» para crear uno.")
 
         columnas = QHBoxLayout()
         columnas.addLayout(

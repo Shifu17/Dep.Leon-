@@ -21,8 +21,10 @@ from PySide6.QtWidgets import (
 
 from .. import cobros, liguilla, rol
 from .comun import (
+    AvisoCampo,
     al_activar,
     boton,
+    boton_mas,
     botones_dialogo,
     campo_busqueda,
     confirmar,
@@ -31,6 +33,7 @@ from .comun import (
     id_seleccionado,
     info,
     llenar,
+    poner_vacio,
     tabla,
 )
 from .filtros import FiltrosLiga
@@ -119,6 +122,8 @@ class DialogoGenerar(QDialog):
                 objectName="ayuda", wordWrap=True,
             )
         )
+        self.aviso = AvisoCampo()
+        raiz.addWidget(self.aviso)
         raiz.addWidget(botones_dialogo(self, self._aceptar, "Generar"))
 
     def categorias_elegidas(self) -> list[int]:
@@ -139,13 +144,13 @@ class DialogoGenerar(QDialog):
     def _aceptar(self):
         horario = self.horario()
         if not self.categorias_elegidas():
-            error(self, "Elige al menos una categoría con 2 equipos o más.")
+            self.aviso.mostrar("Elige al menos una categoría con 2 equipos o más.")
         elif not horario.dias:
-            error(self, "Elige al menos un día de juego.")
+            self.aviso.mostrar("Elige al menos un día de juego.")
         elif not horario.canchas:
-            error(self, "Elige al menos una cancha.")
+            self.aviso.mostrar("Elige al menos una cancha.")
         elif any(fin - inicio < horario.minutos for inicio, fin in horario.dias.values()):
-            error(self, "En cada día, el horario debe alcanzar para al menos un partido.")
+            self.aviso.mostrar("En cada día, el horario debe alcanzar para al menos un partido.")
         else:
             self.accept()
 
@@ -207,6 +212,8 @@ class DialogoPartido(QDialog):
         forma.addRow("Hora:", self.hora)
         forma.addRow("Duración:", self.minutos)
         forma.addRow("Cancha:", self.cancha)
+        self.aviso = AvisoCampo()
+        forma.addRow(self.aviso)
         forma.addRow(botones_dialogo(self, self._aceptar))
 
     def _cargar_equipos(self):
@@ -230,17 +237,17 @@ class DialogoPartido(QDialog):
     def _aceptar(self):
         fecha, hora, minutos, cancha, local, visitante = self.valores()
         if local is None or visitante is None:
-            error(self, "Esta categoría todavía no tiene equipos.")
+            self.aviso.mostrar("Esta categoría todavía no tiene equipos.")
             return
         if local == visitante:
-            error(self, "Un equipo no puede jugar contra sí mismo.")
+            self.aviso.mostrar("Un equipo no puede jugar contra sí mismo.")
             return
         conflicto = rol.buscar_conflicto(
             self.conn, fecha, hora, minutos, cancha, local, visitante,
             self.partido["id"] if self.partido else None,
         )
         if conflicto:
-            error(self, conflicto)
+            self.aviso.mostrar(conflicto)
             return
         ausentes = rol.equipos_no_disponibles(self.conn, fecha, hora, minutos, [local, visitante])
         if ausentes and not confirmar(
@@ -304,14 +311,16 @@ class PaginaRol(QWidget):
         )
         self.descansan = QLabel(objectName="ayuda", wordWrap=True)
         al_activar(self.tabla, self.editar)
+        poner_vacio(self.tabla, "No hay partidos. Pulsa «Generar rol» para crearlos.")
         self.busqueda = campo_busqueda(self.tabla, "Buscar equipo", ancho=150)
 
         acciones = QHBoxLayout()
         acciones.addWidget(boton("Generar rol", self.generar))
         acciones.addWidget(boton("Agregar partido", self.agregar, "secundario"))
         acciones.addWidget(boton("Editar o reprogramar", self.editar, "secundario"))
-        acciones.addWidget(boton("Posponer", self.posponer, "secundario"))
-        acciones.addWidget(boton("Eliminar", self.eliminar, "peligro"))
+        acciones.addWidget(
+            boton_mas("Más", [("Posponer partido", self.posponer), ("Eliminar partido", self.eliminar)])
+        )
         acciones.addStretch(1)
         acciones.addWidget(self.busqueda)
 

@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from .. import liguilla, resultados, rol
 from .comun import (
+    AvisoCampo,
     al_activar,
     boton,
     botones_dialogo,
@@ -104,6 +105,8 @@ class DialogoResultado(QDialog):
                 objectName="ayuda", wordWrap=True,
             )
         )
+        self.aviso = AvisoCampo()
+        raiz.addWidget(self.aviso)
         raiz.addWidget(botones_dialogo(self, self._aceptar))
 
     def _columna(self, nombre: str, equipo_id: int, marcador: QSpinBox, previos: dict[int, int]):
@@ -150,7 +153,7 @@ class DialogoResultado(QDialog):
                 else None,
             )
         except ValueError as exc:
-            error(self, str(exc))
+            self.aviso.mostrar(str(exc))
             return
         self.accept()
 

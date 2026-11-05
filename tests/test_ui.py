@@ -125,7 +125,7 @@ def test_dialogo_de_partido_bloquea_empalme(pagina_rol, conn, monkeypatch):
     dialogo.hora.setTime(QTime(h, m))
     dialogo.cancha.setCurrentIndex(dialogo.cancha.findData(partido["cancha"]))
     dialogo._aceptar()
-    assert errores and "ocupada" in errores[0]
+    assert "ocupada" in dialogo.aviso.text() and dialogo.aviso.isVisibleTo(dialogo)
     assert dialogo.result() == 0
 
 

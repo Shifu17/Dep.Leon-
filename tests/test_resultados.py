@@ -319,7 +319,7 @@ def test_dialogo_resultado_muestra_error_si_no_cuadra(ventana, conn, partido_ui,
     dialogo = ui_resultados.DialogoResultado(ventana, conn, fila, "A", "B")
     dialogo.goles[a0].setValue(1)
     dialogo._aceptar()
-    assert "más goles" in errores[0] and dialogo.result() == 0
+    assert "más goles" in dialogo.aviso.text() and dialogo.result() == 0
 
 
 @pytest.mark.parametrize("posponer", [True, False])

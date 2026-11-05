@@ -119,14 +119,14 @@ def test_pantalla_muestra_datos_y_filtra(ventana, datos):
     assert pagina.proximos.item(0, 0).text() == "Hoy"
     assert "Miércoles 4 de noviembre" in pagina.titulo_equipos.text()
     assert pagina.equipos_jugar.rowCount() == 2
-    assert pagina.ligas.rowCount() == 6
+    assert pagina.ligas.rowCount() == 1  # solo las ligas con equipos
 
     pagina.liga.setCurrentIndex(pagina.liga.findText("Femenil"))
     assert pagina.equipos.numero.text() == "0"
     assert pagina.proximos.rowCount() == 0
     assert pagina.titulo_equipos.text() == "Equipos por jugar"
     # El resumen por liga siempre muestra todas.
-    assert pagina.ligas.rowCount() == 6
+    assert pagina.ligas.rowCount() == 1  # solo las ligas con equipos
 
 
 def test_al_volver_a_inicio_se_actualiza(ventana, datos, conn):

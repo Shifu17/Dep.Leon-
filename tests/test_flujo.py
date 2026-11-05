@@ -165,7 +165,7 @@ def test_inicio_avisa_y_lleva_a_capturar(ventana, app, conn, con_atrasados, torn
     pagina.refrescar()
     app.processEvents()
     assert pagina.por_capturar.numero.text() == "2"
-    assert pagina.por_capturar.numero.objectName() == "tarjetaAlerta"
+    assert pagina.por_capturar.numero.objectName() == "datoAlerta"
     assert pagina.aviso.isVisible()
     assert pagina.aviso_texto.text() == "2 partidos ya pasaron y no tienen resultado."
 
@@ -182,7 +182,7 @@ def test_inicio_avisa_y_lleva_a_capturar(ventana, app, conn, con_atrasados, torn
 def test_sin_atrasados_no_hay_aviso(ventana, conn, torneo_id):
     ventana.inicio.refrescar()
     assert not ventana.inicio.aviso.isVisible()
-    assert ventana.inicio.por_capturar.numero.objectName() == "tarjetaNumero"
+    assert ventana.inicio.por_capturar.numero.objectName() == "datoNumero"
     assert ventana.inicio.por_capturar.numero.text() == "0"
 
 

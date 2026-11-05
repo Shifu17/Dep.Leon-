@@ -11,7 +11,9 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
+    QVBoxLayout,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -71,6 +73,81 @@ def etiqueta(texto: str, control: QWidget) -> QLabel:
     resultado.setBuddy(control)
     control.setAccessibleName(texto.rstrip(":"))
     return resultado
+
+
+class AvisoCampo(QLabel):
+    """Mensaje de error junto al campo que lo causa; se borra en cuanto se corrige.
+
+    Sin campo, sirve para errores que involucran varios datos, al pie del formulario.
+    """
+
+    def __init__(self, campo: QWidget | None = None):
+        super().__init__(objectName="errorCampo", wordWrap=True)
+        self.campo = campo
+        self.setVisible(False)
+        if campo is not None:
+            for senal in ("textEdited", "dateChanged", "timeChanged", "valueChanged", "currentIndexChanged"):
+                if hasattr(campo, senal):
+                    getattr(campo, senal).connect(self.limpiar)
+
+    def _marcar(self, invalido: bool):
+        if self.campo is not None:
+            self.campo.setProperty("invalido", invalido)
+            self.campo.setAccessibleDescription(self.text() if invalido else "")
+            self.campo.style().unpolish(self.campo)
+            self.campo.style().polish(self.campo)
+
+    def mostrar(self, texto: str):
+        self.setText(texto)
+        self.setVisible(True)
+        self._marcar(True)
+        if self.campo is not None:
+            self.campo.setFocus()
+
+    def limpiar(self, *_):
+        if self.isVisible():
+            self.setVisible(False)
+            self._marcar(False)
+
+
+def fila_con_error(forma, titulo: str, campo: QWidget) -> AvisoCampo:
+    forma.addRow(titulo, campo)
+    aviso = AvisoCampo(campo)
+    forma.addRow(aviso)
+    return aviso
+
+
+def boton_mas(texto: str, acciones: list[tuple[str, object]]) -> QPushButton:
+    """Agrupa acciones poco frecuentes o delicadas para no saturar la pantalla de botones."""
+    resultado = QPushButton(texto, objectName="mas")
+    resultado.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+    menu = QMenu(resultado)
+    for nombre, accion in acciones:
+        menu.addAction(nombre).triggered.connect(lambda _=False, a=accion: a())
+    resultado.setMenu(menu)
+    return resultado
+
+
+def poner_vacio(tabla_: QTableWidget, texto: str) -> None:
+    """Texto que orienta cuando la tabla no tiene filas, en lugar de un rectángulo en blanco."""
+    if not hasattr(tabla_, "_vacio"):
+        tabla_._vacio = QLabel(objectName="vacio", wordWrap=True, alignment=Qt.AlignmentFlag.AlignCenter)
+        disposicion = QVBoxLayout(tabla_.viewport())
+        disposicion.setContentsMargins(24, 48, 24, 24)
+        disposicion.addWidget(tabla_._vacio, 0, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+    tabla_._vacio_texto = texto
+    actualizar_vacio(tabla_)
+
+
+def actualizar_vacio(tabla_: QTableWidget) -> None:
+    if not hasattr(tabla_, "_vacio"):
+        return
+    visibles = sum(not tabla_.isRowHidden(r) for r in range(tabla_.rowCount()))
+    if tabla_.rowCount() == 0:
+        tabla_._vacio.setText(tabla_._vacio_texto)
+    else:
+        tabla_._vacio.setText("Ninguna fila coincide con la búsqueda.")
+    tabla_._vacio.setVisible(visibles == 0)
 
 
 def boton(texto: str, al_pulsar, estilo: str | None = None) -> QPushButton:
@@ -155,6 +232,7 @@ def filtrar(tabla_: QTableWidget, texto: str, ids: set | None = None) -> None:
     fila = tabla_.currentRow()
     if tabla_.selectedItems() and fila >= 0 and tabla_.isRowHidden(fila):
         tabla_.clearSelection()  # las acciones no deben caer sobre una fila que ya no se ve
+    actualizar_vacio(tabla_)
 
 
 def campo_busqueda(tabla_: QTableWidget, ayuda: str, al_cambiar=None, ancho: int = 220) -> QLineEdit:

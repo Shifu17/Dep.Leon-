@@ -412,7 +412,7 @@ def test_dialogo_pago_no_permite_mas_que_la_deuda(ventana):
         dialogo._aceptar()
     finally:
         modulo.error = original
-    assert errores and dialogo.result() == 0
+    assert "mayor a cero" in dialogo.error_monto.text() and dialogo.result() == 0
 
 
 def test_solo_con_adeudo_filtra(ventana, conn, torneo_id, categoria, con_tarifa):

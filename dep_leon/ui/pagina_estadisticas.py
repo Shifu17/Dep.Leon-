@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import estadisticas, resultados
-from .comun import boton, botones_dialogo, error, llenar, tabla
+from .comun import boton, botones_dialogo, error, llenar, poner_vacio, tabla
 from .filtros import FiltrosLiga
 
 
@@ -72,6 +72,9 @@ class PaginaEstadisticas(QWidget):
         )
         self.goleadores = _solo_lectura(["#", "Jugador", "Equipo", "Goles"], estirar=1)
         self.porteria = _solo_lectura(["#", "Equipo", "PJ", "Recibidos", "Promedio"], estirar=1)
+        poner_vacio(self.clasificacion, "No hay equipos en esta categoría.")
+        poner_vacio(self.goleadores, "Todavía no hay goles registrados.")
+        poner_vacio(self.porteria, "Aparecerá cuando haya partidos jugados.")
         self.leyenda = QLabel(
             "PJ jugados · PG ganados · PE empatados · PP perdidos · GF goles a favor · GC goles en contra "
             "· DG diferencia · Pts puntos",
@@ -106,7 +109,7 @@ class PaginaEstadisticas(QWidget):
         torneo, categoria = self.filtros.torneo_id, self.filtros.categoria_id
         if torneo is None or categoria is None:
             for control in (self.clasificacion, self.goleadores, self.porteria):
-                control.setRowCount(0)
+                llenar(control, [])
             return
         posiciones = estadisticas.tabla_posiciones(self.conn, torneo, categoria)
         llenar(

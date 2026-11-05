@@ -4,7 +4,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from . import rol
+from . import cobros, rol
 from .db import clave_orden
 
 
@@ -67,6 +67,46 @@ def primer_atrasado(conn: sqlite3.Connection, hoy: date, liga_id: int | None = N
         (rol.PROGRAMADO, hoy.isoformat(), liga_id, liga_id),
     ).fetchone()
     return (fila["liga_id"], fila["torneo_id"]) if fila else None
+
+
+def sin_fecha(conn: sqlite3.Connection, liga_id: int | None = None) -> tuple[int, tuple | None]:
+    """Partidos pospuestos o sin horario en común, y (liga, torneo) del primero."""
+    filas = conn.execute(
+        """SELECT t.liga_id, p.torneo_id FROM partidos p JOIN torneos t ON t.id = p.torneo_id
+           WHERE p.estado IN (?, ?) AND (? IS NULL OR t.liga_id = ?) ORDER BY p.id""",
+        (rol.POSPUESTO, rol.POR_PROGRAMAR, liga_id, liga_id),
+    ).fetchall()
+    return len(filas), ((filas[0]["liga_id"], filas[0]["torneo_id"]) if filas else None)
+
+
+def por_cobrar(conn: sqlite3.Connection, liga_id: int | None = None) -> tuple[int, tuple | None]:
+    """Total pendiente de cobro y (liga, torneo) del torneo que más debe."""
+    total, mayor, destino = 0, 0, None
+    for t in conn.execute(
+        "SELECT id, liga_id FROM torneos WHERE ? IS NULL OR liga_id = ? ORDER BY id", (liga_id, liga_id)
+    ).fetchall():
+        cobros.sincronizar_torneo(conn, t["id"])
+        pendiente = cobros.resumen(conn, t["id"]).pendiente
+        total += pendiente
+        if pendiente > mayor:
+            mayor, destino = pendiente, (t["liga_id"], t["id"])
+    return total, destino
+
+
+def siguiente_paso(conn: sqlite3.Connection, liga_id: int | None = None) -> tuple | None:
+    """Lo que falta para empezar a usar el programa: (pantalla, explicación, texto del botón)."""
+    filtro = "(? IS NULL OR t.liga_id = ?)"
+    if not conn.execute(f"SELECT 1 FROM torneos t WHERE {filtro} LIMIT 1", (liga_id, liga_id)).fetchone():
+        return "ligas", "Para empezar, crea un torneo en «Ligas y categorías».", "Crear torneo"
+    if not conn.execute(
+        f"SELECT 1 FROM equipos e JOIN torneos t ON t.id = e.torneo_id WHERE {filtro} LIMIT 1", (liga_id, liga_id)
+    ).fetchone():
+        return "equipos", "Siguiente paso: registra los equipos y sus jugadores.", "Registrar equipos"
+    if not conn.execute(
+        f"SELECT 1 FROM partidos p JOIN torneos t ON t.id = p.torneo_id WHERE {filtro} LIMIT 1", (liga_id, liga_id)
+    ).fetchone():
+        return "rol", "Siguiente paso: genera el rol de juegos.", "Generar rol"
+    return None
 
 
 def proximos_partidos(

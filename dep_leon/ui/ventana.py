@@ -80,7 +80,7 @@ class Ventana(QMainWindow):
         self.config.datos_cambiados.connect(self.rol.refrescar)
         self.config.buscar_actualizacion.connect(lambda: self.revisar_actualizacion(manual=True))
         self.config.cerrar_sesion.connect(self.cerrar_sesion)
-        self.inicio.ir_a_capturar.connect(self._ir_a_capturar)
+        self.inicio.ir_a.connect(self._ir_a)
         for pagina in (self.equipos, self.rol, self.resultados, self.estadisticas, self.liguilla, self.cobros, self.reportes):
             pagina.filtros.elegido.connect(lambda p=pagina: self._recordar_seleccion(p))
 
@@ -168,10 +168,18 @@ class Ventana(QMainWindow):
             pagina.filtros.aplicar(*self._seleccion)
         self.pila.setCurrentWidget(pagina)
 
-    def _ir_a_capturar(self, liga_id: int, torneo_id: int):
-        self._seleccion = (liga_id, torneo_id, None)
-        self.resultados.ver.setCurrentText(VER_POR_CAPTURAR)
-        self._navegacion[self.resultados].click()
+    def _ir_a(self, destino: str, liga_id, torneo_id):
+        pagina = {
+            "ligas": self.ligas, "equipos": self.equipos, "rol": self.rol,
+            "resultados": self.resultados, "cobros": self.cobros,
+        }[destino]
+        if liga_id is not None:
+            self._seleccion = (liga_id, torneo_id, None)
+        if destino == "resultados":
+            self.resultados.ver.setCurrentText(VER_POR_CAPTURAR)
+        self._navegacion[pagina].click()
+        if destino == "rol":
+            self.rol.fecha.setCurrentIndex(0)  # los partidos sin fecha solo aparecen en «Todas»
 
     def _enfocar_busqueda(self):
         campo = getattr(self.pila.currentWidget(), "busqueda", None)

@@ -30,16 +30,20 @@ from ..db import clave_orden
 from ..jugadores import NUMERO_MAX, POSICIONES, borrar_foto, error_de_edad, guardar_foto
 from ..paths import fotos_dir
 from .comun import (
+    AvisoCampo,
     al_activar,
     boton,
+    boton_mas,
     botones_dialogo,
     campo_busqueda,
     confirmar,
     error,
+    fila_con_error,
     filtrar,
     id_seleccionado,
     info,
     llenar,
+    poner_vacio,
     tabla,
 )
 from .filtros import FiltrosLiga
@@ -59,14 +63,14 @@ class DialogoEquipo(QDialog):
             self.categoria.setCurrentIndex(self.categoria.findData(equipo["categoria_id"]))
         forma = QFormLayout(self)
         forma.addRow("Categoría:", self.categoria)
-        forma.addRow("Nombre:", self.nombre)
+        self.error_nombre = fila_con_error(forma, "Nombre:", self.nombre)
         forma.addRow("Responsable:", self.responsable)
         forma.addRow("Teléfono:", self.telefono)
         forma.addRow(botones_dialogo(self, self._aceptar))
 
     def _aceptar(self):
         if not self.nombre.text().strip():
-            error(self, "Escribe el nombre del equipo.")
+            self.error_nombre.mostrar("Escribe el nombre del equipo.")
             return
         self.accept()
 
@@ -108,6 +112,8 @@ class DialogoDisponibilidad(QDialog):
                 objectName="ayuda", wordWrap=True,
             )
         )
+        self.aviso = AvisoCampo()
+        raiz.addWidget(self.aviso)
         raiz.addWidget(botones_dialogo(self, self._aceptar))
         self._actualizar()
 
@@ -133,10 +139,10 @@ class DialogoDisponibilidad(QDialog):
     def _aceptar(self):
         valores = self.valores()
         if not self.siempre.isChecked() and not valores:
-            error(self, "Marca al menos un día, o la opción de cualquier día.")
+            self.aviso.mostrar("Marca al menos un día, o la opción de cualquier día.")
             return
         if any(desde >= hasta for desde, hasta in valores.values()):
-            error(self, "En cada día, la hora «desde» debe ser menor que la hora «hasta».")
+            self.aviso.mostrar("En cada día, la hora «desde» debe ser menor que la hora «hasta».")
             return
         self.accept()
 
@@ -166,8 +172,8 @@ class DialogoJugador(QDialog):
                 self._mostrar_foto(fotos_dir() / jugador["foto"])
 
         forma = QFormLayout(self)
-        forma.addRow("Nombre completo:", self.nombre)
-        forma.addRow("Fecha de nacimiento:", self.fecha)
+        self.error_nombre = fila_con_error(forma, "Nombre completo:", self.nombre)
+        self.error_fecha = fila_con_error(forma, "Fecha de nacimiento:", self.fecha)
         forma.addRow("Número de playera:", self.numero)
         forma.addRow("Posición:", self.posicion)
         forma.addRow("Foto:", self.vista_foto)
@@ -201,13 +207,13 @@ class DialogoJugador(QDialog):
 
     def _aceptar(self):
         if not self.nombre.text().strip():
-            error(self, "Escribe el nombre del jugador.")
+            self.error_nombre.mostrar("Escribe el nombre del jugador.")
             return
         motivo = error_de_edad(
             self.fecha_nacimiento(), self.categoria["anio_min"], self.categoria["anio_max"]
         )
         if motivo:
-            error(self, motivo)
+            self.error_fecha.mostrar(motivo)
             return
         self.accept()
 
@@ -275,8 +281,12 @@ class PaginaEquipos(QWidget):
         self.filtros.cambiado.connect(self.refrescar_equipos)
 
         excel_fila = QHBoxLayout()
-        excel_fila.addWidget(boton("Descargar plantilla de Excel", self.descargar_plantilla, "secundario"))
-        excel_fila.addWidget(boton("Importar Excel", self.importar_excel))
+        excel_fila.addWidget(
+            boton_mas(
+                "Excel",
+                [("Descargar plantilla", self.descargar_plantilla), ("Importar jugadores", self.importar_excel)],
+            )
+        )
         excel_fila.addStretch(1)
 
         self.tabla_equipos = tabla(["Equipo", "Categoría", "Jugadores", "Disponible"], estirar=0)
@@ -284,6 +294,8 @@ class PaginaEquipos(QWidget):
         self.tabla_equipos.itemSelectionChanged.connect(self.refrescar_jugadores)
         al_activar(self.tabla_equipos, self.editar_equipo)
         al_activar(self.tabla_jugadores, self.editar_jugador)
+        poner_vacio(self.tabla_equipos, "No hay equipos en este torneo.")
+        poner_vacio(self.tabla_jugadores, "Selecciona un equipo para ver sus jugadores.")
         self.busqueda = campo_busqueda(self.tabla_equipos, "Buscar equipo o jugador", self._buscar)
         excel_fila.addWidget(self.busqueda)
 
@@ -293,8 +305,17 @@ class PaginaEquipos(QWidget):
         fila = QHBoxLayout()
         fila.addWidget(boton("Agregar", self.nuevo_equipo))
         fila.addWidget(boton("Editar", self.editar_equipo, "secundario"))
-        fila.addWidget(boton("Eliminar", self.borrar_equipo, "peligro"))
-        fila.addWidget(boton("Disponibilidad", self.editar_disponibilidad, "secundario"))
+        fila.addWidget(
+            boton_mas(
+                "Más",
+                [
+                    ("Disponibilidad", self.editar_disponibilidad),
+                    ("Credenciales PDF", self.generar_credenciales),
+                    ("Eliminar equipo", self.borrar_equipo),
+                ],
+            )
+        )
+        fila.addStretch(1)
         izquierda.addLayout(fila)
 
         derecha = QVBoxLayout()
@@ -305,7 +326,6 @@ class PaginaEquipos(QWidget):
         fila.addWidget(boton("Editar", self.editar_jugador, "secundario"))
         fila.addWidget(boton("Eliminar", self.borrar_jugador, "peligro"))
         fila.addStretch(1)
-        fila.addWidget(boton("Credenciales PDF", self.generar_credenciales))
         derecha.addLayout(fila)
 
         columnas = QHBoxLayout()
@@ -388,6 +408,12 @@ class PaginaEquipos(QWidget):
                 for f in filas
             ],
         )
+        poner_vacio(
+            self.tabla_equipos,
+            "No hay equipos en este torneo. Pulsa «Agregar» o importa jugadores desde «Excel»."
+            if self._torneo_id()
+            else "Primero crea un torneo en «Ligas y categorías».",
+        )
         filtrar(self.tabla_equipos, self.busqueda.text(), self._equipos_con_jugador(self.busqueda.text()))
         self.refrescar_jugadores()
 
@@ -409,6 +435,12 @@ class PaginaEquipos(QWidget):
                 )
                 for j in filas
             ],
+        )
+        poner_vacio(
+            self.tabla_jugadores,
+            "Este equipo no tiene jugadores. Pulsa «Agregar»."
+            if id_seleccionado(self.tabla_equipos)
+            else "Selecciona un equipo para ver sus jugadores.",
         )
         self._filtrar_jugadores()
 

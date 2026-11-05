@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -24,6 +25,8 @@ from PySide6.QtWidgets import (
 from .. import cobros, recibos
 from .comun import (
     al_activar,
+    fila_con_error,
+    poner_vacio,
     boton,
     botones_dialogo,
     campo_busqueda,
@@ -34,9 +37,21 @@ from .comun import (
     tabla,
 )
 from .filtros import FiltrosLiga
-from .pagina_inicio import Tarjeta
 
 MONTO_MAXIMO = 1_000_000
+
+
+class Tarjeta(QFrame):
+    """Cifra grande con su nombre, para los totales de dinero."""
+
+    def __init__(self, texto: str):
+        super().__init__(objectName="tarjeta")
+        self.numero = QLabel("0", objectName="tarjetaNumero")
+        columna = QVBoxLayout(self)
+        columna.setContentsMargins(16, 10, 16, 10)
+        columna.setSpacing(0)
+        columna.addWidget(self.numero)
+        columna.addWidget(QLabel(texto, objectName="tarjetaTexto"))
 
 
 def _campo_monto(centavos: int = 0) -> QDoubleSpinBox:
@@ -103,7 +118,7 @@ class DialogoPago(QDialog):
         forma = QFormLayout(self)
         forma.addRow(QLabel(equipo, objectName="seccion"))
         forma.addRow(QLabel(f"Debe en total: {cobros.dinero(deuda)}"))
-        forma.addRow("Monto:", self.monto)
+        self.error_monto = fila_con_error(forma, "Monto:", self.monto)
         forma.addRow("Fecha:", self.fecha)
         forma.addRow("Nota:", self.nota)
         forma.addRow(
@@ -117,7 +132,7 @@ class DialogoPago(QDialog):
 
     def _aceptar(self):
         if self.monto.value() <= 0:
-            error(self, "Escribe un monto mayor a cero.")
+            self.error_monto.mostrar("Escribe un monto mayor a cero.")
             return
         self.accept()
 
@@ -175,6 +190,8 @@ class PaginaCobros(QWidget):
 
         self.cargos = tabla(["Concepto", "Detalle", "Fecha", "Monto", "Pagado", "Saldo"], estirar=1)
         al_activar(self.cargos, self.registrar_pago)
+        poner_vacio(self.equipos, "No hay equipos en este torneo.")
+        poner_vacio(self.cargos, "Selecciona un equipo para ver sus cargos.")
         fila_cargos = QHBoxLayout()
         fila_cargos.addWidget(boton("Registrar pago", self.registrar_pago))
         fila_cargos.addWidget(boton("Ajustar monto", self.ajustar, "secundario"))
@@ -182,6 +199,7 @@ class PaginaCobros(QWidget):
 
         self.pagos = tabla(["Folio", "Fecha", "Monto", "Nota", "Estado"], estirar=3)
         al_activar(self.pagos, self.recibo)
+        poner_vacio(self.pagos, "Sin pagos registrados.")
         fila_pagos = QHBoxLayout()
         fila_pagos.addWidget(boton("Recibo PDF", self.recibo))
         fila_pagos.addWidget(boton("Anular pago", self.anular, "peligro"))
@@ -216,7 +234,8 @@ class PaginaCobros(QWidget):
         if torneo is None:
             for t in (self.cargado, self.cobrado, self.pendiente):
                 t.numero.setText(cobros.dinero(0))
-            self.equipos.setRowCount(0)
+            poner_vacio(self.equipos, "Primero crea un torneo en «Ligas y categorías».")
+            llenar(self.equipos, [])
             self.refrescar_detalle()
             return
         cobros.sincronizar_torneo(self.conn, torneo)
@@ -242,6 +261,12 @@ class PaginaCobros(QWidget):
     def refrescar_detalle(self):
         equipo = id_seleccionado(self.equipos)
         cargos = cobros.cargos_de_equipo(self.conn, equipo) if equipo else []
+        poner_vacio(
+            self.cargos,
+            "Este equipo no tiene cargos. Revisa los montos en «Montos del torneo»."
+            if equipo
+            else "Selecciona un equipo para ver sus cargos.",
+        )
         llenar(
             self.cargos,
             [

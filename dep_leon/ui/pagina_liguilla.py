@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import liguilla, rol
-from .comun import boton, confirmar, error, etiqueta, info, llenar, tabla
+from .comun import boton, boton_mas, confirmar, error, etiqueta, info, llenar, tabla
 from .filtros import FiltrosLiga
 from .pagina_resultados import borrar_resultado, capturar_partido, marcar_no_presentado
 from .pagina_rol import editar_partido
@@ -100,12 +100,19 @@ class PaginaLiguilla(QWidget):
         acciones = QHBoxLayout()
         acciones.addWidget(boton("Programar partido", self.programar, "secundario"))
         acciones.addWidget(boton("Capturar resultado", self.capturar))
-        acciones.addWidget(boton("No se presentó", self.no_se_presento, "secundario"))
-        acciones.addWidget(boton("Borrar resultado", self.borrar, "peligro"))
+        acciones.addWidget(
+            boton_mas(
+                "Más",
+                [
+                    ("No se presentó un equipo", self.no_se_presento),
+                    ("Borrar resultado", self.borrar),
+                    ("Eliminar liguilla", self.eliminar),
+                ],
+            )
+        )
         acciones.addStretch(1)
         acciones.addWidget(etiqueta("Si empatan:", self.desempate))
         acciones.addWidget(self.desempate)
-        acciones.addWidget(boton("Eliminar liguilla", self.eliminar, "peligro"))
 
         self.campeon = QLabel(objectName="campeon")
         self.campeon.setVisible(False)

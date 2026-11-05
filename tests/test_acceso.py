@@ -120,7 +120,7 @@ def test_primera_vez_muestra_crear_y_entrega_codigo(app, conn, monkeypatch):
     errores = []
     monkeypatch.setattr(ui_acceso, "error", lambda _, m: errores.append(m))
     dialogo.crear()
-    assert errores == ["Las contraseñas no coinciden."] and not acceso.hay_cuenta(conn)
+    assert dialogo.aviso_crear.text() == "Las contraseñas no coinciden." and not acceso.hay_cuenta(conn)
 
     dialogo.confirmacion.setText("secreto1")
     dialogo.crear()
