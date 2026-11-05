@@ -12,6 +12,7 @@ from PySide6.QtCore import QDate, QTime
 from dep_leon import updater
 from dep_leon.ui import pagina_equipos as pagina_equipos_mod
 from dep_leon.ui import pagina_rol as pagina_rol_mod
+from dep_leon.ui import ventana as ventana_mod
 from dep_leon.ui.tema import ESTILO
 from dep_leon.ui.ventana import Ventana
 
@@ -147,3 +148,42 @@ def test_equipo_con_partidos_no_se_borra(ventana, pagina_rol, monkeypatch):
     ventana.equipos.tabla_equipos.selectRow(0)
     ventana.equipos.borrar_equipo()
     assert "partidos en el rol" in errores[0]
+
+
+def test_progreso_de_actualizacion_y_cancelacion(ventana):
+    actualizacion = updater.Actualizacion("9.9.9", "", "u", "h")
+    pantalla = []
+    original = updater.descargar
+    try:
+        updater.descargar = lambda *a: (_ for _ in ()).throw(updater.Cancelada())
+        ventana._descargar(actualizacion)
+        assert ventana._progreso is not None
+        ventana._al_avanzar(10 * 1024 * 1024, 40 * 1024 * 1024)
+        assert ventana._progreso.value() == 25
+        assert ventana._progreso.labelText() == "Descargando: 10 de 40 MB"
+        pantalla.append(ventana._progreso.labelText())
+        ventana._al_cancelar_descarga()
+        assert ventana._progreso is None
+    finally:
+        updater.descargar = original
+
+
+def test_si_la_instalacion_falla_avisa_y_no_cierra(ventana, monkeypatch):
+    errores, salidas = [], []
+    monkeypatch.setattr(ventana_mod, "error", lambda _, m: errores.append(m))
+    monkeypatch.setattr(ventana_mod.QApplication, "quit", lambda: salidas.append(True))
+
+    def falla(_):
+        raise PermissionError("carpeta protegida")
+
+    monkeypatch.setattr(updater, "instalar_y_abrir", falla)
+    ventana._al_descargar("ruta")
+    assert salidas == [] and "versión actual" in errores[0] and "carpeta protegida" in errores[0]
+
+
+def test_instalacion_correcta_cierra_el_programa(ventana, monkeypatch):
+    salidas, instaladas = [], []
+    monkeypatch.setattr(ventana_mod.QApplication, "quit", lambda: salidas.append(True))
+    monkeypatch.setattr(updater, "instalar_y_abrir", instaladas.append)
+    ventana._al_descargar("ruta")
+    assert instaladas == ["ruta"] and salidas == [True]

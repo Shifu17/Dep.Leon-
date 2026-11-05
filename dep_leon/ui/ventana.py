@@ -43,8 +43,10 @@ class _Senales(QObject):
     encontrada = Signal(object, bool)
     sin_novedad = Signal(bool)
     sin_conexion = Signal(bool)
+    avance = Signal(int, int)
     descargada = Signal(object)
     descarga_fallida = Signal(str)
+    descarga_cancelada = Signal()
 
 
 class Ventana(QMainWindow):
@@ -92,7 +94,9 @@ class Ventana(QMainWindow):
         self.senales.encontrada.connect(self._al_encontrar)
         self.senales.sin_novedad.connect(self._al_no_haber_novedad)
         self.senales.sin_conexion.connect(self._al_no_haber_conexion)
+        self.senales.avance.connect(self._al_avanzar)
         self.senales.descargada.connect(self._al_descargar)
+        self.senales.descarga_cancelada.connect(self._al_cancelar_descarga)
         self.senales.descarga_fallida.connect(self._al_fallar_descarga)
 
         # Sin internet solo se reintenta en silencio más tarde.
@@ -100,6 +104,8 @@ class Ventana(QMainWindow):
         self.temporizador.timeout.connect(self.revisar_actualizacion)
         self.temporizador.start()
         QTimer.singleShot(1500, self.revisar_actualizacion)
+        if updater.puede_instalar():
+            threading.Thread(target=updater.limpiar_restos, daemon=True).start()
 
     def _crear_barra(self) -> QWidget:
         barra = QWidget(objectName="barra")
@@ -198,27 +204,52 @@ class Ventana(QMainWindow):
         self._descargar(actualizacion)
 
     def _descargar(self, actualizacion: updater.Actualizacion):
-        self._progreso = QProgressDialog("Descargando actualización...", "", 0, 0, self)
-        self._progreso.setCancelButton(None)
+        self._cancelar_descarga = threading.Event()
+        self._progreso = QProgressDialog("Conectando...", "Cancelar", 0, 100, self)
+        self._progreso.setWindowTitle("Actualización")
         self._progreso.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self._progreso.setMinimumDuration(0)
+        self._progreso.setAutoClose(False)
+        self._progreso.setAutoReset(False)
+        self._progreso.setValue(0)
+        self._progreso.canceled.connect(self._cancelar_descarga.set)
         self._progreso.show()
+        cancelar = self._cancelar_descarga
 
         def trabajo():
             try:
-                self.senales.descargada.emit(updater.descargar(actualizacion))
+                ruta = updater.descargar(actualizacion, self.senales.avance.emit, cancelar)
+                self.senales.descargada.emit(ruta)
+            except updater.Cancelada:
+                self.senales.descarga_cancelada.emit()
             except updater.SinConexion:
                 self.senales.descarga_fallida.emit(
-                    "Se perdió la conexión. La actualización se intentará más tarde."
+                    "Se perdió la conexión durante la descarga. Inténtalo de nuevo más tarde."
                 )
             except (ValueError, OSError) as exc:
                 self.senales.descarga_fallida.emit(str(exc))
 
         threading.Thread(target=trabajo, daemon=True).start()
 
+    def _al_avanzar(self, recibido: int, total: int):
+        if not self._progreso:
+            return
+        mb = 1024 * 1024
+        if total:
+            self._progreso.setValue(min(99, recibido * 100 // total))
+            self._progreso.setLabelText(f"Descargando: {recibido // mb} de {total // mb} MB")
+        else:
+            self._progreso.setRange(0, 0)
+            self._progreso.setLabelText(f"Descargando: {recibido // mb} MB")
+
     def _cerrar_progreso(self):
         if self._progreso:
             self._progreso.close()
             self._progreso = None
+
+    def _al_cancelar_descarga(self):
+        self._cerrar_progreso()
+        self._avisada = None
 
     def _al_fallar_descarga(self, mensaje: str):
         self._cerrar_progreso()
@@ -226,15 +257,22 @@ class Ventana(QMainWindow):
         error(self, mensaje)
 
     def _al_descargar(self, ruta):
-        self._cerrar_progreso()
+        if self._progreso:
+            self._progreso.setCancelButton(None)
+            self._progreso.setRange(0, 0)
+            self._progreso.setLabelText("Instalando...")
+            QApplication.processEvents()
         try:
             carpeta = data_dir() / "respaldos"
             carpeta.mkdir(exist_ok=True)
             db.respaldar(
                 self.conn, carpeta / f"antes de actualizar {datetime.now():%Y-%m-%d %H%M}.zip", fotos_dir()
             )
+            updater.instalar_y_abrir(ruta)
         except OSError as exc:
-            error(self, f"No se actualizó porque no se pudo crear el respaldo previo: {exc}")
+            self._al_fallar_descarga(
+                "No se pudo instalar la actualización y sigues con la versión actual.\n\n"
+                f"Motivo: {exc}\n\nPuedes descargarla desde la página del programa en GitHub."
+            )
             return
-        updater.instalar_y_cerrar(ruta)
         QApplication.quit()

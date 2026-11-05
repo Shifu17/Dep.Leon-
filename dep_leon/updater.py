@@ -2,17 +2,25 @@
 
 Sin internet no ocurre nada. Si hay una versión nueva, se avisa y solo se instala cuando el
 usuario acepta; el ejecutable descargado debe coincidir con la huella SHA-256 publicada.
+
+Windows no deja sobrescribir un .exe en uso, pero sí renombrarlo. Por eso la instalación se hace
+desde el propio programa, sin procesos auxiliares que esperen a que cierre: renombra el .exe actual,
+pone el nuevo en su lugar y lo abre. Si algo falla, deja todo como estaba.
 """
 
 import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,11 +29,21 @@ URL_ULTIMA = f"https://api.github.com/repos/{REPO}/releases/latest"
 NOMBRE_EXE = "DeportivoLeon.exe"
 AGENTE = "DeportivoLeon-actualizador"
 TIEMPO_ESPERA = 10
-TIEMPO_DESCARGA = 300
+TIEMPO_DESCARGA = 30  # segundos sin recibir datos antes de dar la conexión por perdida
+BLOQUE = 1024 * 256
+SUFIJO_NUEVO = ".nuevo"
+SUFIJO_ANTERIOR = ".anterior"
+PREFIJO_TEMPORAL = "DeportivoLeon-"
+ARCHIVOS_DE_DESCARGA = {NOMBRE_EXE, "actualizar.bat"}
+HORAS_PARA_LIMPIAR = 1
 
 
 class SinConexion(Exception):
     """No se pudo contactar el servidor de actualizaciones."""
+
+
+class Cancelada(Exception):
+    """Quien usa el programa canceló la descarga."""
 
 
 @dataclass(frozen=True)
@@ -78,64 +96,132 @@ def buscar(actual: str) -> Actualizacion | None:
     return Actualizacion(version.lstrip("v"), str(datos.get("body") or ""), url_exe, url_huella)
 
 
-def descargar(actualizacion: Actualizacion) -> Path:
-    """Descarga y verifica el ejecutable. Lanza SinConexion o ValueError si algo falla."""
-    carpeta = Path(tempfile.mkdtemp(prefix="DeportivoLeon-"))
+def descargar(
+    actualizacion: Actualizacion,
+    progreso: Callable[[int, int], None] | None = None,
+    cancelar: threading.Event | None = None,
+) -> Path:
+    """Descarga y verifica el ejecutable, y devuelve su ruta en una carpeta temporal.
+
+    progreso recibe (bytes recibidos, bytes totales; 0 si el total no se conoce). Lanza
+    SinConexion, Cancelada o ValueError, y en esos casos no deja archivos.
+    """
+    carpeta = Path(tempfile.mkdtemp(prefix=PREFIJO_TEMPORAL))
     destino = carpeta / NOMBRE_EXE
     huella = hashlib.sha256()
     try:
-        with _abrir(actualizacion.url_huella, TIEMPO_ESPERA) as respuesta:
-            esperada = respuesta.read(1024).decode("ascii", "ignore").split()[0].lower()
-        with _abrir(actualizacion.url_exe, TIEMPO_DESCARGA) as respuesta, destino.open("wb") as salida:
-            while bloque := respuesta.read(1024 * 256):
-                huella.update(bloque)
-                salida.write(bloque)
-    except (OSError, IndexError) as exc:
-        raise SinConexion(str(exc)) from exc
-    if huella.hexdigest() != esperada:
-        destino.unlink(missing_ok=True)
-        raise ValueError("La descarga no coincide con la huella publicada; no se instaló.")
+        try:
+            with _abrir(actualizacion.url_huella, TIEMPO_ESPERA) as respuesta:
+                esperada = respuesta.read(1024).decode("ascii", "ignore").split()[0].lower()
+            with _abrir(actualizacion.url_exe, TIEMPO_DESCARGA) as respuesta, destino.open("wb") as salida:
+                encabezados = getattr(respuesta, "headers", None)
+                total = int(encabezados.get("Content-Length") or 0) if encabezados else 0
+                recibido = 0
+                while bloque := respuesta.read(BLOQUE):
+                    if cancelar is not None and cancelar.is_set():
+                        raise Cancelada
+                    huella.update(bloque)
+                    salida.write(bloque)
+                    recibido += len(bloque)
+                    if progreso:
+                        progreso(recibido, total)
+        except (OSError, IndexError) as exc:
+            raise SinConexion(str(exc)) from exc
+        if huella.hexdigest() != esperada:
+            raise ValueError("La descarga no coincide con la huella publicada; no se instaló.")
+    except Exception:
+        shutil.rmtree(carpeta, ignore_errors=True)
+        raise
     return destino
 
 
-def script_reemplazo(nuevo: Path, actual: Path, pid: int) -> str:
-    """Script que espera a que el programa cierre, reemplaza el .exe y lo vuelve a abrir."""
-    return f"""@echo off
-chcp 65001 >nul
-:esperar
-"%SystemRoot%\\System32\\tasklist.exe" /FI "PID eq {pid}" /NH | "%SystemRoot%\\System32\\find.exe" "{pid}" >nul
-if not errorlevel 1 (
-  ping -n 2 127.0.0.1 >nul
-  goto esperar
-)
-set intentos=0
-:mover
-move /y "{nuevo}" "{actual}" >nul 2>&1
-if not errorlevel 1 goto abrir
-set /a intentos+=1
-if %intentos% geq 15 goto abrir
-ping -n 2 127.0.0.1 >nul
-goto mover
-:abrir
-start "" "{actual}"
-del "%~f0"
-"""
+def reemplazar(nuevo: Path, exe: Path) -> Path:
+    """Pone el .exe nuevo en lugar del actual, que sigue en uso, y devuelve la ruta del anterior.
+
+    Lanza OSError si la carpeta no lo permite; en ese caso el .exe actual queda intacto.
+    """
+    provisional = exe.with_name(exe.name + SUFIJO_NUEVO)
+    anterior = exe.with_name(f"{exe.name}{SUFIJO_ANTERIOR}.{os.getpid()}")
+    shutil.copyfile(nuevo, provisional)
+    try:
+        if provisional.stat().st_size != nuevo.stat().st_size:
+            raise OSError("La copia de la actualización quedó incompleta.")
+        os.replace(exe, anterior)
+        try:
+            os.replace(provisional, exe)
+        except OSError:
+            os.replace(anterior, exe)
+            raise
+    except OSError:
+        provisional.unlink(missing_ok=True)
+        raise
+    return anterior
 
 
-def instalar_y_cerrar(nuevo: Path) -> None:
-    """Lanza el reemplazo en segundo plano; quien llama debe cerrar el programa enseguida."""
-    script = nuevo.parent / "actualizar.bat"
-    script.write_text(
-        script_reemplazo(nuevo, Path(sys.executable), os.getpid()), encoding="utf-8"
-    )
+def deshacer(exe: Path, anterior: Path) -> None:
+    """Regresa el .exe anterior a su lugar."""
+    exe.unlink(missing_ok=True)
+    os.replace(anterior, exe)
+
+
+def abrir_programa(exe: Path) -> None:
     # Hace que el .exe reabierto sea una instancia independiente de esta (PyInstaller).
     entorno = {**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"}
     subprocess.Popen(
-        ["cmd", "/c", str(script)],
+        [str(exe)],
+        cwd=str(exe.parent),
         env=entorno,
-        creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+        creationflags=subprocess.DETACHED_PROCESS,
         close_fds=True,
     )
+
+
+def instalar_y_abrir(nuevo: Path, exe: Path | None = None) -> None:
+    """Instala la versión descargada y la abre; quien llama debe cerrar el programa enseguida.
+
+    Lanza OSError si no se pudo; en ese caso sigue instalada la versión actual.
+    """
+    exe = exe or Path(sys.executable)
+    anterior = reemplazar(nuevo, exe)
+    try:
+        abrir_programa(exe)
+    except OSError:
+        deshacer(exe, anterior)
+        raise
+    shutil.rmtree(nuevo.parent, ignore_errors=True)
+
+
+def limpiar_restos(
+    exe: Path | None = None, temporal: Path | None = None, intentos: int = 15, espera: float = 1.0
+) -> None:
+    """Borra lo que dejó una actualización: el .exe anterior y descargas abandonadas.
+
+    El .exe anterior se libera cuando termina de cerrarse la versión vieja, por eso se reintenta.
+    """
+    exe = exe or Path(sys.executable)
+    temporal = temporal or Path(tempfile.gettempdir())
+    limite = time.time() - HORAS_PARA_LIMPIAR * 3600
+    for carpeta in temporal.glob(f"{PREFIJO_TEMPORAL}*"):
+        try:
+            if (
+                carpeta.is_dir()
+                and carpeta.stat().st_mtime < limite
+                and {a.name for a in carpeta.iterdir()} <= ARCHIVOS_DE_DESCARGA
+            ):
+                shutil.rmtree(carpeta, ignore_errors=True)
+        except OSError:
+            continue
+    for intento in range(intentos):
+        restantes = []
+        for archivo in [*exe.parent.glob(f"{exe.name}{SUFIJO_ANTERIOR}*"), exe.with_name(exe.name + SUFIJO_NUEVO)]:
+            try:
+                archivo.unlink(missing_ok=True)
+            except OSError:
+                restantes.append(archivo)
+        if not restantes:
+            return
+        if intento < intentos - 1:
+            time.sleep(espera)
 
 
 def puede_instalar() -> bool:

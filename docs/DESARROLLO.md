@@ -141,6 +141,11 @@ cuya huella SHA-256 coincida con la publicada.
 Los archivos deben llamarse exactamente así, y la versión no debe marcarse como preliminar. De lo
 contrario, el programa no la detecta.
 
+La instalación se hace dentro del programa: renombra el `.exe` en uso a `*.anterior.<pid>`, pone el nuevo
+en su lugar, lo abre y cierra. Al arrancar, la versión nueva borra el anterior. Si algo falla, regresa al
+`.exe` original. Antes de publicar un cambio en este flujo, prueba el `.exe` real, no solo las pruebas
+automáticas.
+
 ## Cuidado con los datos
 
 El repositorio es público. **Nunca subas** la base de datos, fotos, respaldos ni archivos de Excel con
