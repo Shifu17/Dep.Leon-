@@ -7,6 +7,7 @@ de 2, los mejores lugares pasan directo a la segunda ronda.
 
 import sqlite3
 from dataclasses import dataclass
+from datetime import date
 
 from . import estadisticas, rol
 
@@ -319,6 +320,35 @@ def vista(conn: sqlite3.Connection, liguilla_id: int) -> list[VistaLlave]:
             )
         )
     return resultado
+
+
+def _linea_equipo(nombre: str, semilla, goles, penales, gano: bool) -> str:
+    if not nombre:
+        return "Por definir"
+    marca = "» " if gano else ""
+    lugar = f"({semilla}) " if semilla else ""
+    marcador = "" if goles is None else f"   {goles}"
+    extra = "" if penales is None else f" ({penales} pen.)"
+    return f"{marca}{lugar}{nombre}{marcador}{extra}"
+
+
+def texto_llave(v: VistaLlave) -> str:
+    if v.pasa_directo:
+        return f"{v.ganador}\nPasa directo a la siguiente ronda"
+    if v.fecha:
+        dia = rol.DIAS[date.fromisoformat(v.fecha).weekday()][:3]
+        cuando = f"{dia} {date.fromisoformat(v.fecha):%d/%m} · {v.hora} · Cancha {rol.nombre_cancha(v.cancha)}"
+    elif v.partido_id:
+        cuando = "Sin fecha"
+    else:
+        cuando = "Esperando rivales"
+    return "\n".join(
+        [
+            cuando,
+            _linea_equipo(v.equipo_a, v.semilla_a, v.goles_a, v.penales_a, bool(v.ganador) and v.ganador == v.equipo_a),
+            _linea_equipo(v.equipo_b, v.semilla_b, v.goles_b, v.penales_b, bool(v.ganador) and v.ganador == v.equipo_b),
+        ]
+    )
 
 
 def campeon(conn: sqlite3.Connection, liguilla_id: int) -> str:

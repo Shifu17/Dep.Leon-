@@ -1,7 +1,6 @@
 """Página de liguilla: elegir el rango de clasificados, ver la llave y capturar sus partidos."""
 
 import sqlite3
-from datetime import date
 
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -33,35 +32,6 @@ def _combo_desempate() -> QComboBox:
     for texto, valor in OPCIONES_DESEMPATE:
         combo.addItem(texto, valor)
     return combo
-
-
-def _linea_equipo(nombre: str, semilla, goles, penales, gano: bool) -> str:
-    if not nombre:
-        return "Por definir"
-    marca = "» " if gano else ""
-    lugar = f"({semilla}) " if semilla else ""
-    marcador = "" if goles is None else f"   {goles}"
-    extra = "" if penales is None else f" ({penales} pen.)"
-    return f"{marca}{lugar}{nombre}{marcador}{extra}"
-
-
-def texto_llave(v: liguilla.VistaLlave) -> str:
-    if v.pasa_directo:
-        return f"{v.ganador}\nPasa directo a la siguiente ronda"
-    if v.fecha:
-        dia = rol.DIAS[date.fromisoformat(v.fecha).weekday()][:3]
-        cuando = f"{dia} {date.fromisoformat(v.fecha):%d/%m} · {v.hora} · Cancha {rol.nombre_cancha(v.cancha)}"
-    elif v.partido_id:
-        cuando = "Sin fecha"
-    else:
-        cuando = "Esperando rivales"
-    return "\n".join(
-        [
-            cuando,
-            _linea_equipo(v.equipo_a, v.semilla_a, v.goles_a, v.penales_a, bool(v.ganador) and v.ganador == v.equipo_a),
-            _linea_equipo(v.equipo_b, v.semilla_b, v.goles_b, v.penales_b, bool(v.ganador) and v.ganador == v.equipo_b),
-        ]
-    )
 
 
 class PaginaLiguilla(QWidget):
@@ -247,7 +217,7 @@ class PaginaLiguilla(QWidget):
             columna.addWidget(QLabel(rondas[numero][0].ronda, objectName="seccion"))
             for v in rondas[numero]:
                 columna.addStretch(1)
-                tarjeta = QPushButton(texto_llave(v), objectName="llave", checkable=True)
+                tarjeta = QPushButton(liguilla.texto_llave(v), objectName="llave", checkable=True)
                 tarjeta.setEnabled(v.partido_id is not None)
                 tarjeta.setChecked(v.id == self._seleccion)
                 tarjeta.clicked.connect(lambda _=False, i=v.id: self._elegir(i))

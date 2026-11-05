@@ -31,12 +31,12 @@ from .pagina_estadisticas import PaginaEstadisticas
 from .pagina_inicio import PaginaInicio
 from .pagina_ligas import PaginaLigas
 from .pagina_liguilla import PaginaLiguilla
+from .pagina_reportes import PaginaReportes
 from .pagina_resultados import PaginaResultados
 from .pagina_rol import PaginaRol
 
 ANCHO_BARRA = 220
 MINUTOS_ENTRE_REVISIONES = 30
-ETAPAS_PENDIENTES = ["Reportes"]
 
 
 class _Senales(QObject):
@@ -66,6 +66,7 @@ class Ventana(QMainWindow):
         self.estadisticas = PaginaEstadisticas(conn)
         self.liguilla = PaginaLiguilla(conn)
         self.cobros = PaginaCobros(conn)
+        self.reportes = PaginaReportes(conn)
         self.config = PaginaConfig(conn)
         self.ligas.datos_cambiados.connect(self.equipos.refrescar)
         self.ligas.datos_cambiados.connect(self.rol.refrescar)
@@ -133,10 +134,7 @@ class Ventana(QMainWindow):
         agregar("Estadísticas", self.estadisticas)
         agregar("Liguilla", self.liguilla)
         agregar("Cobros", self.cobros)
-        for texto in ETAPAS_PENDIENTES:
-            pendiente = QPushButton(texto, objectName="nav", enabled=False)
-            pendiente.setToolTip("Disponible en una próxima etapa")
-            columna.addWidget(pendiente)
+        agregar("Reportes", self.reportes)
         columna.addStretch(1)
         agregar("Configuración", self.config)
         return barra
