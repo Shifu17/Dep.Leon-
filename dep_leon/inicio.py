@@ -18,6 +18,7 @@ class ResumenLiga:
     equipos: int
     jugadores: int
     por_jugar: int
+    por_capturar: int
     jugados: int
     pospuestos: int
 
@@ -32,12 +33,14 @@ def resumen_por_liga(conn: sqlite3.Connection, hoy: date) -> list[ResumenLiga]:
              JOIN torneos t ON t.id = e.torneo_id WHERE t.liga_id = l.id) AS jugadores,
             (SELECT COUNT(*) FROM partidos p JOIN torneos t ON t.id = p.torneo_id
              WHERE t.liga_id = l.id AND p.estado = ? AND p.fecha >= ?) AS por_jugar,
+            (SELECT COUNT(*) FROM partidos p JOIN torneos t ON t.id = p.torneo_id
+             WHERE t.liga_id = l.id AND p.estado = ? AND p.fecha < ?) AS por_capturar,
             (SELECT COUNT(*) FROM resultados r JOIN partidos p ON p.id = r.partido_id
              JOIN torneos t ON t.id = p.torneo_id WHERE t.liga_id = l.id) AS jugados,
             (SELECT COUNT(*) FROM partidos p JOIN torneos t ON t.id = p.torneo_id
              WHERE t.liga_id = l.id AND p.estado = ?) AS pospuestos
            FROM ligas l ORDER BY l.id""",
-        (rol.PROGRAMADO, hoy.isoformat(), rol.POSPUESTO),
+        (rol.PROGRAMADO, hoy.isoformat(), rol.PROGRAMADO, hoy.isoformat(), rol.POSPUESTO),
     ).fetchall()
     return [ResumenLiga(*f) for f in filas]
 
@@ -53,6 +56,17 @@ def _partidos_futuros(conn: sqlite3.Connection, hoy: date, liga_id: int | None, 
             ORDER BY p.fecha, p.hora, p.cancha""",
         (rol.PROGRAMADO, hoy.isoformat(), liga_id, liga_id, *args),
     )
+
+
+def primer_atrasado(conn: sqlite3.Connection, hoy: date, liga_id: int | None = None) -> tuple | None:
+    """(liga, torneo) del partido más antiguo sin resultado, para llevar directo a capturarlo."""
+    fila = conn.execute(
+        """SELECT t.liga_id, p.torneo_id FROM partidos p JOIN torneos t ON t.id = p.torneo_id
+           WHERE p.estado = ? AND p.fecha < ? AND (? IS NULL OR t.liga_id = ?)
+           ORDER BY p.fecha, p.hora LIMIT 1""",
+        (rol.PROGRAMADO, hoy.isoformat(), liga_id, liga_id),
+    ).fetchone()
+    return (fila["liga_id"], fila["torneo_id"]) if fila else None
 
 
 def proximos_partidos(

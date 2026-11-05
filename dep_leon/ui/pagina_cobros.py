@@ -22,7 +22,17 @@ from PySide6.QtWidgets import (
 )
 
 from .. import cobros, recibos
-from .comun import boton, botones_dialogo, confirmar, error, id_seleccionado, llenar, tabla
+from .comun import (
+    al_activar,
+    boton,
+    botones_dialogo,
+    campo_busqueda,
+    confirmar,
+    error,
+    id_seleccionado,
+    llenar,
+    tabla,
+)
 from .filtros import FiltrosLiga
 from .pagina_inicio import Tarjeta
 
@@ -152,6 +162,9 @@ class PaginaCobros(QWidget):
         self.solo_adeudo.toggled.connect(self.refrescar)
         self.equipos = tabla(["Equipo", "Categoría", "Cargos", "Pagado", "Saldo"], estirar=0)
         self.equipos.itemSelectionChanged.connect(self.refrescar_detalle)
+        self.busqueda = campo_busqueda(self.equipos, "Buscar equipo", ancho=150)
+        fila_filtros.insertWidget(1, self.busqueda)
+        al_activar(self.equipos, self.registrar_pago)
         encabezado_equipos = QHBoxLayout()
         encabezado_equipos.addWidget(QLabel("Adeudos por equipo", objectName="seccion"))
         encabezado_equipos.addStretch(1)
@@ -161,12 +174,14 @@ class PaginaCobros(QWidget):
         izquierda.addWidget(self.equipos, 1)
 
         self.cargos = tabla(["Concepto", "Detalle", "Fecha", "Monto", "Pagado", "Saldo"], estirar=1)
+        al_activar(self.cargos, self.registrar_pago)
         fila_cargos = QHBoxLayout()
         fila_cargos.addWidget(boton("Registrar pago", self.registrar_pago))
         fila_cargos.addWidget(boton("Ajustar monto", self.ajustar, "secundario"))
         fila_cargos.addStretch(1)
 
         self.pagos = tabla(["Folio", "Fecha", "Monto", "Nota", "Estado"], estirar=3)
+        al_activar(self.pagos, self.recibo)
         fila_pagos = QHBoxLayout()
         fila_pagos.addWidget(boton("Recibo PDF", self.recibo))
         fila_pagos.addWidget(boton("Anular pago", self.anular, "peligro"))

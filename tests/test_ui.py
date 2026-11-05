@@ -5,23 +5,13 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PySide6.QtWidgets import QApplication
-
 from PySide6.QtCore import QDate, QTime
 
 from dep_leon import updater
 from dep_leon.ui import pagina_equipos as pagina_equipos_mod
 from dep_leon.ui import pagina_rol as pagina_rol_mod
 from dep_leon.ui import ventana as ventana_mod
-from dep_leon.ui.tema import ESTILO
 from dep_leon.ui.ventana import Ventana
-
-
-@pytest.fixture(scope="session")
-def app():
-    aplicacion = QApplication.instance() or QApplication([])
-    aplicacion.setStyleSheet(ESTILO)
-    return aplicacion
 
 
 @pytest.fixture

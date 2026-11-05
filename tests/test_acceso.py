@@ -3,7 +3,6 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PySide6.QtWidgets import QApplication
 
 from dep_leon import acceso, db
 from dep_leon.ui import acceso as ui_acceso
@@ -107,11 +106,6 @@ def test_respaldo_con_otra_cuenta_no_cambia_quien_entra(conn, tmp_path):
 
 
 # --- Pantallas ---
-
-
-@pytest.fixture
-def app():
-    return QApplication.instance() or QApplication([])
 
 
 def test_primera_vez_muestra_crear_y_entrega_codigo(app, conn, monkeypatch):

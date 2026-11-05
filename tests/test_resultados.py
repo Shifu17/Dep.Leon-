@@ -5,7 +5,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from datetime import date
 
 import pytest
-from PySide6.QtWidgets import QApplication
 
 from dep_leon import db, estadisticas, resultados, rol, updater
 from dep_leon.ui import pagina_equipos as ui_equipos
@@ -257,8 +256,7 @@ def test_respaldo_anterior_recibe_tablas_de_resultados(conn, tmp_path):
 
 
 @pytest.fixture
-def ventana(conn, monkeypatch, tmp_path):
-    QApplication.instance() or QApplication([])
+def ventana(app, conn, monkeypatch, tmp_path):
     monkeypatch.setenv("DEP_LEON_DATA", str(tmp_path))
     monkeypatch.setattr(updater, "buscar", lambda actual: None)
     resultado = Ventana(conn)

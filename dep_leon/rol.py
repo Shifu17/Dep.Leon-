@@ -25,6 +25,7 @@ POSPUESTO = "Pospuesto"
 JUGADO = "Jugado"
 DEFAULT = "Default"
 POR_PROGRAMAR = "Por programar"
+ATRASADO = "Atrasado"  # solo se muestra: es un partido programado cuya fecha ya pasó
 
 # Los partidos de liguilla usan un número de jornada aparte: 101 es la final, 102 la semifinal...
 BASE_LIGUILLA = 100

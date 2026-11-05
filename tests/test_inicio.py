@@ -5,7 +5,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from datetime import date, timedelta
 
 import pytest
-from PySide6.QtWidgets import QApplication
 
 from dep_leon import inicio, rol, updater
 from dep_leon.ui.ventana import Ventana
@@ -88,8 +87,7 @@ def test_dia_corto(fecha, esperado):
 
 
 @pytest.fixture
-def ventana(conn, monkeypatch, tmp_path):
-    QApplication.instance() or QApplication([])
+def ventana(app, conn, monkeypatch, tmp_path):
     monkeypatch.setenv("DEP_LEON_DATA", str(tmp_path))
     monkeypatch.setattr(updater, "buscar", lambda actual: None)
     monkeypatch.setattr(rol, "hoy", lambda: HOY)

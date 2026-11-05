@@ -4,6 +4,7 @@ import sqlite3
 from datetime import date
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -21,8 +22,20 @@ from PySide6.QtWidgets import (
 )
 
 from .. import liguilla, resultados, rol
-from .comun import boton, botones_dialogo, confirmar, error, etiqueta, id_seleccionado, llenar, tabla
+from .comun import (
+    al_activar,
+    boton,
+    botones_dialogo,
+    campo_busqueda,
+    confirmar,
+    error,
+    etiqueta,
+    id_seleccionado,
+    llenar,
+    tabla,
+)
 from .filtros import FiltrosLiga
+from .tema import ROJO
 
 GOLES_MAXIMOS = 99
 VER_POR_CAPTURAR = "Por capturar"
@@ -233,6 +246,13 @@ def borrar_resultado(padre: QWidget, conn: sqlite3.Connection, partido_id: int) 
     return True
 
 
+def _estado(partido) -> str:
+    """Un partido cuya fecha ya pasó y no tiene resultado se señala como atrasado."""
+    if partido["estado"] == rol.PROGRAMADO and partido["fecha"] and partido["fecha"] < rol.hoy().isoformat():
+        return rol.ATRASADO
+    return partido["estado"]
+
+
 class PaginaResultados(QWidget):
     def __init__(self, conn: sqlite3.Connection):
         super().__init__()
@@ -254,6 +274,7 @@ class PaginaResultados(QWidget):
         acciones.addWidget(boton("No se presentó", self.no_se_presento, "secundario"))
         acciones.addWidget(boton("Borrar resultado", self.borrar, "peligro"))
         acciones.addStretch(1)
+        self.fila_acciones = acciones
 
         self.tabla = tabla(
             ["Fecha", "Hora", "Equipo", "Marcador", "Equipo", "Categoría", "Fase", "Estado"], estirar=2
@@ -261,7 +282,9 @@ class PaginaResultados(QWidget):
         self.tabla.horizontalHeader().setSectionResizeMode(
             4, self.tabla.horizontalHeader().ResizeMode.Stretch
         )
-        self.tabla.doubleClicked.connect(self.capturar)
+        al_activar(self.tabla, self.capturar)
+        self.busqueda = campo_busqueda(self.tabla, "Buscar equipo")
+        self.fila_acciones.addWidget(self.busqueda)
         self.vacio = QLabel(objectName="ayuda", wordWrap=True)
 
         raiz = QVBoxLayout(self)
@@ -304,12 +327,15 @@ class PaginaResultados(QWidget):
                         date.fromisoformat(p["fecha"]).strftime("%d/%m/%Y") if p["fecha"] else "Sin fecha",
                         p["hora"] or "-", p["local"],
                         f"{p['goles_local']} - {p['goles_visitante']}" if p["goles_local"] is not None else "-",
-                        p["visitante"], p["categoria"], rol.nombre_jornada(p["jornada"]), p["estado"],
+                        p["visitante"], p["categoria"], rol.nombre_jornada(p["jornada"]), _estado(p),
                     ],
                 )
                 for p in filas
             ],
         )
+        for f in range(self.tabla.rowCount()):
+            if self.tabla.item(f, 7).text() == rol.ATRASADO:
+                self.tabla.item(f, 7).setForeground(QColor(ROJO))
         self.vacio.setText(
             "" if filas else "No hay partidos en esta vista. Los partidos se crean en «Rol de juegos»."
         )

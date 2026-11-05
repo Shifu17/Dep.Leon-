@@ -10,6 +10,7 @@ from .comun import etiqueta
 
 class FiltrosLiga(QWidget):
     cambiado = Signal()
+    elegido = Signal()  # solo cuando la persona cambia una lista, no al refrescar
 
     def __init__(self, conn: sqlite3.Connection, con_todas: bool):
         super().__init__()
@@ -23,6 +24,8 @@ class FiltrosLiga(QWidget):
         self.categoria.currentIndexChanged.connect(self.cambiado)
         self._categoria_elegida = False
         self.categoria.activated.connect(self._marcar_eleccion)
+        for control in (self.liga, self.torneo, self.categoria):
+            control.activated.connect(self.elegido)
         fila = QHBoxLayout(self)
         fila.setContentsMargins(0, 0, 0, 0)
         for texto, control in (("Liga:", self.liga), ("Torneo:", self.torneo), ("Categoría:", self.categoria)):
@@ -58,20 +61,38 @@ class FiltrosLiga(QWidget):
         self.liga.blockSignals(False)
         self._al_cambiar_liga()
 
-    def _al_cambiar_liga(self):
-        actual = self.torneo.currentData()
+    def seleccion(self) -> tuple:
+        return self.liga.currentData(), self.torneo.currentData(), self.categoria.currentData()
+
+    def aplicar(self, liga_id, torneo_id, categoria_id) -> None:
+        """Toma la selección hecha en otra pantalla, sin avisar más de una vez."""
+        self.liga.blockSignals(True)
+        self.liga.setCurrentIndex(max(self.liga.findData(liga_id), 0))
+        self.liga.blockSignals(False)
+        self._cargar_torneos(torneo_id)
+        self._categoria_elegida = categoria_id is not None
+        self._cargar_categorias(categoria_id)
+        self.cambiado.emit()
+
+    def _cargar_torneos(self, torneo_id) -> None:
         self.torneo.blockSignals(True)
         self.torneo.clear()
         for t in self.conn.execute(
             "SELECT id, nombre FROM torneos WHERE liga_id = ? ORDER BY nombre COLLATE ES", (self.liga.currentData(),)
         ):
             self.torneo.addItem(t["nombre"], t["id"])
-        self.torneo.setCurrentIndex(max(self.torneo.findData(actual), 0))
+        self.torneo.setCurrentIndex(max(self.torneo.findData(torneo_id), 0))
         self.torneo.blockSignals(False)
+
+    def _al_cambiar_liga(self):
+        self._cargar_torneos(self.torneo.currentData())
         self._al_cambiar_torneo()
 
     def _al_cambiar_torneo(self):
-        actual = self.categoria.currentData()
+        self._cargar_categorias(self.categoria.currentData())
+        self.cambiado.emit()
+
+    def _cargar_categorias(self, actual) -> None:
         self.categoria.blockSignals(True)
         self.categoria.clear()
         if self.con_todas:
@@ -93,4 +114,3 @@ class FiltrosLiga(QWidget):
                 indice = self.categoria.findData(con_equipos[0])
         self.categoria.setCurrentIndex(max(indice, 0))
         self.categoria.blockSignals(False)
-        self.cambiado.emit()

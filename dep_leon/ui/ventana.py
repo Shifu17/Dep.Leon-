@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -32,7 +32,7 @@ from .pagina_inicio import PaginaInicio
 from .pagina_ligas import PaginaLigas
 from .pagina_liguilla import PaginaLiguilla
 from .pagina_reportes import PaginaReportes
-from .pagina_resultados import PaginaResultados
+from .pagina_resultados import VER_POR_CAPTURAR, PaginaResultados
 from .pagina_rol import PaginaRol
 
 ANCHO_BARRA = 220
@@ -58,6 +58,8 @@ class Ventana(QMainWindow):
         self.conn = conn
         self._avisada: str | None = None
         self._progreso: QProgressDialog | None = None
+        self._seleccion: tuple | None = None  # liga, torneo y categoría elegidas por la persona
+        self._navegacion: dict[QWidget, QPushButton] = {}
 
         self.pila = QStackedWidget()
         self.inicio = PaginaInicio(conn)
@@ -78,6 +80,9 @@ class Ventana(QMainWindow):
         self.config.datos_cambiados.connect(self.rol.refrescar)
         self.config.buscar_actualizacion.connect(lambda: self.revisar_actualizacion(manual=True))
         self.config.cerrar_sesion.connect(self.cerrar_sesion)
+        self.inicio.ir_a_capturar.connect(self._ir_a_capturar)
+        for pagina in (self.equipos, self.rol, self.resultados, self.estadisticas, self.liguilla, self.cobros, self.reportes):
+            pagina.filtros.elegido.connect(lambda p=pagina: self._recordar_seleccion(p))
 
         contenido = QWidget(objectName="contenido")
         cuerpo = QHBoxLayout(contenido)
@@ -89,6 +94,8 @@ class Ventana(QMainWindow):
         margen.addWidget(self.pila)
         cuerpo.addLayout(margen, 1)
         self.setCentralWidget(contenido)
+        contenido.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        contenido.setFocus()
 
         self.senales = _Senales()
         self.senales.encontrada.connect(self._al_encontrar)
@@ -128,7 +135,11 @@ class Ventana(QMainWindow):
             self.pila.addWidget(pagina)
             nav = QPushButton(texto, objectName="nav", checkable=True)
             nav.setFocusPolicy(Qt.FocusPolicy.TabFocus)
-            nav.clicked.connect(lambda: self.pila.setCurrentWidget(pagina))
+            nav.clicked.connect(lambda: self._mostrar(pagina))
+            atajo = str((len(self._navegacion) + 1) % 10)
+            nav.setToolTip(f"Ctrl+{atajo}")
+            QShortcut(QKeySequence(f"Ctrl+{atajo}"), self).activated.connect(nav.click)
+            self._navegacion[pagina] = nav
             grupo.addButton(nav)
             columna.addWidget(nav)
             return nav
@@ -144,7 +155,36 @@ class Ventana(QMainWindow):
         agregar("Reportes", self.reportes)
         columna.addStretch(1)
         agregar("Configuración", self.config)
+        QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(self._enfocar_busqueda)
+        QShortcut(QKeySequence("F5"), self).activated.connect(self._refrescar_pagina)
         return barra
+
+    def _recordar_seleccion(self, pagina: QWidget):
+        self._seleccion = pagina.filtros.seleccion()
+
+    def _mostrar(self, pagina: QWidget):
+        # Inicio y Ligas tienen su propia vista; las demás conservan lo elegido por la persona.
+        if self._seleccion and hasattr(pagina, "filtros"):
+            pagina.filtros.aplicar(*self._seleccion)
+        self.pila.setCurrentWidget(pagina)
+
+    def _ir_a_capturar(self, liga_id: int, torneo_id: int):
+        self._seleccion = (liga_id, torneo_id, None)
+        self.resultados.ver.setCurrentText(VER_POR_CAPTURAR)
+        self._navegacion[self.resultados].click()
+
+    def _enfocar_busqueda(self):
+        campo = getattr(self.pila.currentWidget(), "busqueda", None)
+        if campo:
+            campo.setFocus()
+            campo.selectAll()
+
+    def _refrescar_pagina(self):
+        pagina = self.pila.currentWidget()
+        if hasattr(pagina, "filtros"):
+            pagina.filtros.refrescar()
+        elif hasattr(pagina, "refrescar"):
+            pagina.refrescar()
 
     def cerrar_sesion(self):
         """Oculta todo hasta volver a iniciar sesión; si se cancela, cierra el programa."""

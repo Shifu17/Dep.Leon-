@@ -20,7 +20,20 @@ from PySide6.QtWidgets import (
 )
 
 from .. import cobros, liguilla, rol
-from .comun import boton, botones_dialogo, confirmar, error, etiqueta, id_seleccionado, info, llenar, tabla
+from .comun import (
+    al_activar,
+    boton,
+    botones_dialogo,
+    campo_busqueda,
+    confirmar,
+    error,
+    etiqueta,
+    id_seleccionado,
+    info,
+    llenar,
+    tabla,
+)
+from .filtros import FiltrosLiga
 
 
 def _a_qtime(minutos: int) -> QTime:
@@ -272,22 +285,16 @@ class PaginaRol(QWidget):
         self.titulo = QLabel(
             "Rol de juegos", objectName="titulo", alignment=Qt.AlignmentFlag.AlignCenter
         )
-        self.liga = QComboBox()
-        self.torneo = QComboBox()
-        self.categoria = QComboBox()
+        self.filtros = FiltrosLiga(conn, con_todas=True)
+        self.liga, self.torneo, self.categoria = self.filtros.liga, self.filtros.torneo, self.filtros.categoria
         self.fecha = QComboBox()
-        self.liga.currentIndexChanged.connect(self._al_cambiar_liga)
-        self.torneo.currentIndexChanged.connect(self._al_cambiar_torneo)
-        self.categoria.currentIndexChanged.connect(self._al_cambiar_torneo)
+        self.filtros.cambiado.connect(self._al_cambiar_torneo)
         self.fecha.currentIndexChanged.connect(self.refrescar_partidos)
 
         filtros = QHBoxLayout()
-        for texto, control in (
-            ("Liga:", self.liga), ("Torneo:", self.torneo),
-            ("Categoría:", self.categoria), ("Fecha:", self.fecha),
-        ):
-            filtros.addWidget(etiqueta(texto, control))
-            filtros.addWidget(control, 1)
+        filtros.addWidget(self.filtros, 4)
+        filtros.addWidget(etiqueta("Fecha:", self.fecha))
+        filtros.addWidget(self.fecha, 1)
 
         self.tabla = tabla(
             ["Fecha", "Hora", "Equipo", "Equipo", "Categoría", "Cancha", "Fase", "Estado"], estirar=2
@@ -296,6 +303,8 @@ class PaginaRol(QWidget):
             3, self.tabla.horizontalHeader().ResizeMode.Stretch
         )
         self.descansan = QLabel(objectName="ayuda", wordWrap=True)
+        al_activar(self.tabla, self.editar)
+        self.busqueda = campo_busqueda(self.tabla, "Buscar equipo", ancho=150)
 
         acciones = QHBoxLayout()
         acciones.addWidget(boton("Generar rol", self.generar))
@@ -304,6 +313,7 @@ class PaginaRol(QWidget):
         acciones.addWidget(boton("Posponer", self.posponer, "secundario"))
         acciones.addWidget(boton("Eliminar", self.eliminar, "peligro"))
         acciones.addStretch(1)
+        acciones.addWidget(self.busqueda)
 
         raiz = QVBoxLayout(self)
         raiz.addWidget(self.titulo)
@@ -326,41 +336,11 @@ class PaginaRol(QWidget):
         ).fetchall()
 
     def refrescar(self):
-        actual = self.liga.currentData()
-        self.liga.blockSignals(True)
-        self.liga.clear()
-        for l in self.conn.execute("SELECT * FROM ligas ORDER BY id"):
-            self.liga.addItem(l["nombre"], l["id"])
-        indice = self.liga.findData(actual)
-        if indice < 0:
-            # Empieza en la primera liga que ya tiene categorías cargadas.
-            con_datos = self.conn.execute(
-                "SELECT liga_id FROM categorias ORDER BY liga_id LIMIT 1"
-            ).fetchone()
-            indice = self.liga.findData(con_datos["liga_id"]) if con_datos else 0
-        self.liga.setCurrentIndex(max(indice, 0))
-        self.liga.blockSignals(False)
-        self._al_cambiar_liga()
+        self.filtros.refrescar()
 
-    def _al_cambiar_liga(self):
-        torneo, categoria = self.torneo.currentData(), self.categoria.currentData()
-        for control in (self.torneo, self.categoria):
-            control.blockSignals(True)
-            control.clear()
-        for t in self.conn.execute(
-            "SELECT * FROM torneos WHERE liga_id = ? ORDER BY nombre COLLATE ES", (self.liga.currentData(),)
-        ):
-            self.torneo.addItem(t["nombre"], t["id"])
-        self.categoria.addItem("Todas", None)
-        for c in self.conn.execute(
-            "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre COLLATE ES", (self.liga.currentData(),)
-        ):
-            self.categoria.addItem(c["nombre"], c["id"])
-        self.torneo.setCurrentIndex(max(self.torneo.findData(torneo), 0))
-        self.categoria.setCurrentIndex(max(self.categoria.findData(categoria), 0))
-        for control in (self.torneo, self.categoria):
-            control.blockSignals(False)
-        self._al_cambiar_torneo()
+    def showEvent(self, evento):
+        super().showEvent(evento)
+        self.filtros.refrescar()
 
     def _al_cambiar_torneo(self):
         """Recarga las fechas: conserva la elegida o, si ya no existe, va a la próxima por jugarse."""

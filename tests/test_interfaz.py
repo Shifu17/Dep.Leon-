@@ -8,7 +8,6 @@ import pytest
 from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
-    QApplication,
     QCheckBox,
     QComboBox,
     QPushButton,
@@ -69,13 +68,6 @@ def test_texto_cumple_contraste_aa(frente, fondo):
 )
 def test_contornos_de_control_se_distinguen(contorno, fondo):
     assert contraste(contorno, fondo) >= 3
-
-
-@pytest.fixture(scope="module")
-def app():
-    aplicacion = QApplication.instance() or QApplication([])
-    aplicacion.setStyleSheet(tema.ESTILO)
-    return aplicacion
 
 
 @pytest.mark.parametrize(

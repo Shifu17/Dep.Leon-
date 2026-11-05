@@ -5,7 +5,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from datetime import date
 
 import pytest
-from PySide6.QtWidgets import QApplication
 
 from dep_leon import cobros, db, recibos, resultados, rol, updater
 from dep_leon.ui import pagina_cobros as ui_cobros
@@ -345,8 +344,7 @@ def test_respaldo_conserva_pagos_y_anteriores_reciben_tablas(conn, con_tarifa, t
 
 
 @pytest.fixture
-def ventana(conn, monkeypatch, tmp_path):
-    QApplication.instance() or QApplication([])
+def ventana(app, conn, monkeypatch, tmp_path):
     monkeypatch.setenv("DEP_LEON_DATA", str(tmp_path))
     monkeypatch.setattr(updater, "buscar", lambda actual: None)
     resultado = Ventana(conn)

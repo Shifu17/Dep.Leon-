@@ -26,9 +26,23 @@ from PySide6.QtWidgets import (
 )
 
 from .. import cobros, credenciales, excel, rol
+from ..db import clave_orden
 from ..jugadores import NUMERO_MAX, POSICIONES, borrar_foto, error_de_edad, guardar_foto
 from ..paths import fotos_dir
-from .comun import boton, botones_dialogo, confirmar, error, etiqueta, id_seleccionado, info, llenar, tabla
+from .comun import (
+    al_activar,
+    boton,
+    botones_dialogo,
+    campo_busqueda,
+    confirmar,
+    error,
+    filtrar,
+    id_seleccionado,
+    info,
+    llenar,
+    tabla,
+)
+from .filtros import FiltrosLiga
 
 
 class DialogoEquipo(QDialog):
@@ -256,17 +270,9 @@ class PaginaEquipos(QWidget):
         self.setObjectName("pagina")
         self.conn = conn
 
-        self.liga = QComboBox()
-        self.torneo = QComboBox()
-        self.categoria = QComboBox()
-        self.liga.currentIndexChanged.connect(self._al_cambiar_liga)
-        self.torneo.currentIndexChanged.connect(self.refrescar_equipos)
-        self.categoria.currentIndexChanged.connect(self.refrescar_equipos)
-
-        filtros = QHBoxLayout()
-        for texto, control in (("Liga:", self.liga), ("Torneo:", self.torneo), ("Categoría:", self.categoria)):
-            filtros.addWidget(etiqueta(texto, control))
-            filtros.addWidget(control, 1)
+        self.filtros = FiltrosLiga(conn, con_todas=True)
+        self.liga, self.torneo, self.categoria = self.filtros.liga, self.filtros.torneo, self.filtros.categoria
+        self.filtros.cambiado.connect(self.refrescar_equipos)
 
         excel_fila = QHBoxLayout()
         excel_fila.addWidget(boton("Descargar plantilla de Excel", self.descargar_plantilla, "secundario"))
@@ -276,6 +282,10 @@ class PaginaEquipos(QWidget):
         self.tabla_equipos = tabla(["Equipo", "Categoría", "Jugadores", "Disponible"], estirar=0)
         self.tabla_jugadores = tabla(["Núm.", "Jugador", "Nacimiento", "Posición", "Foto"], estirar=1)
         self.tabla_equipos.itemSelectionChanged.connect(self.refrescar_jugadores)
+        al_activar(self.tabla_equipos, self.editar_equipo)
+        al_activar(self.tabla_jugadores, self.editar_jugador)
+        self.busqueda = campo_busqueda(self.tabla_equipos, "Buscar equipo o jugador", self._buscar)
+        excel_fila.addWidget(self.busqueda)
 
         izquierda = QVBoxLayout()
         izquierda.addWidget(QLabel("Equipos", objectName="seccion"))
@@ -304,7 +314,7 @@ class PaginaEquipos(QWidget):
 
         raiz = QVBoxLayout(self)
         raiz.addWidget(QLabel("Equipos y jugadores", objectName="titulo"))
-        raiz.addLayout(filtros)
+        raiz.addWidget(self.filtros)
         raiz.addLayout(excel_fila)
         raiz.addLayout(columnas)
         self.refrescar()
@@ -321,39 +331,40 @@ class PaginaEquipos(QWidget):
         ).fetchall()
 
     def refrescar(self):
-        actual = self._liga_id()
-        self.liga.blockSignals(True)
-        self.liga.clear()
-        for l in self.conn.execute("SELECT * FROM ligas ORDER BY id"):
-            self.liga.addItem(l["nombre"], l["id"])
-        indice = self.liga.findData(actual)
-        if indice < 0:
-            # Empieza en la primera liga que ya tiene categorías cargadas.
-            con_datos = self.conn.execute(
-                "SELECT liga_id FROM categorias ORDER BY liga_id LIMIT 1"
-            ).fetchone()
-            indice = self.liga.findData(con_datos["liga_id"]) if con_datos else 0
-        self.liga.setCurrentIndex(max(indice, 0))
-        self.liga.blockSignals(False)
-        self._al_cambiar_liga()
+        self.filtros.refrescar()
 
-    def _al_cambiar_liga(self):
-        torneo_actual, categoria_actual = self.torneo.currentData(), self.categoria.currentData()
-        for control in (self.torneo, self.categoria):
-            control.blockSignals(True)
-            control.clear()
-        for t in self.conn.execute(
-            "SELECT * FROM torneos WHERE liga_id = ? ORDER BY nombre COLLATE ES", (self._liga_id(),)
-        ):
-            self.torneo.addItem(t["nombre"], t["id"])
-        self.categoria.addItem("Todas", None)
-        for c in self._categorias():
-            self.categoria.addItem(c["nombre"], c["id"])
-        self.torneo.setCurrentIndex(max(self.torneo.findData(torneo_actual), 0))
-        self.categoria.setCurrentIndex(max(self.categoria.findData(categoria_actual), 0))
-        for control in (self.torneo, self.categoria):
-            control.blockSignals(False)
-        self.refrescar_equipos()
+    def showEvent(self, evento):
+        super().showEvent(evento)
+        self.filtros.refrescar()
+
+    def _equipos_con_jugador(self, texto: str) -> set:
+        buscado = clave_orden(texto.strip())
+        if not buscado:
+            return set()
+        filas = self.conn.execute(
+            """SELECT j.equipo_id, j.nombre FROM jugadores j JOIN equipos e ON e.id = j.equipo_id
+               WHERE e.torneo_id = ?""",
+            (self._torneo_id(),),
+        ).fetchall()
+        return {f["equipo_id"] for f in filas if buscado in clave_orden(f["nombre"])}
+
+    def _buscar(self, texto: str):
+        """Busca en equipos y en sus jugadores; si nada está elegido, abre la primera coincidencia."""
+        filtrar(self.tabla_equipos, texto, self._equipos_con_jugador(texto))
+        if texto.strip() and id_seleccionado(self.tabla_equipos) is None:
+            for r in range(self.tabla_equipos.rowCount()):
+                if not self.tabla_equipos.isRowHidden(r):
+                    self.tabla_equipos.selectRow(r)
+                    break
+        self._filtrar_jugadores()
+
+    def _filtrar_jugadores(self):
+        """Si el equipo coincide por nombre se ven todos; si no, solo los jugadores que coinciden."""
+        texto = self.busqueda.text()
+        fila = self.tabla_equipos.currentRow()
+        celda = self.tabla_equipos.item(fila, 0) if fila >= 0 else None
+        por_equipo = celda is not None and clave_orden(texto.strip()) in clave_orden(celda.text())
+        filtrar(self.tabla_jugadores, "" if por_equipo else texto)
 
     def refrescar_equipos(self):
         filas = self.conn.execute(
@@ -377,6 +388,7 @@ class PaginaEquipos(QWidget):
                 for f in filas
             ],
         )
+        filtrar(self.tabla_equipos, self.busqueda.text(), self._equipos_con_jugador(self.busqueda.text()))
         self.refrescar_jugadores()
 
     def refrescar_jugadores(self):
@@ -398,6 +410,7 @@ class PaginaEquipos(QWidget):
                 for j in filas
             ],
         )
+        self._filtrar_jugadores()
 
     def _avisar_cambio(self):
         self.refrescar_equipos()

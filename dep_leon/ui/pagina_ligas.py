@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .comun import boton, botones_dialogo, confirmar, error, id_seleccionado, llenar, tabla
+from .comun import al_activar, boton, botones_dialogo, confirmar, error, id_seleccionado, llenar, tabla
 
 MODALIDADES = ["Fut 7", "Fut 11"]
 
@@ -125,6 +125,9 @@ class PaginaLigas(QWidget):
         self.tabla_categorias = tabla(["Categoría", "Años de nacimiento"], estirar=0)
         self.tabla_torneos = tabla(["Torneo"])
         self.tabla_ligas.itemSelectionChanged.connect(self.refrescar_detalle)
+        al_activar(self.tabla_ligas, self.editar_liga)
+        al_activar(self.tabla_categorias, self.editar_categoria)
+        al_activar(self.tabla_torneos, self.editar_torneo)
 
         columnas = QHBoxLayout()
         columnas.addLayout(

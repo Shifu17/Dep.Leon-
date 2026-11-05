@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import date
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -17,11 +17,11 @@ from PySide6.QtWidgets import (
 )
 
 from .. import estadisticas, inicio, rol
-from .comun import etiqueta, llenar, tabla
+from .comun import boton, etiqueta, llenar, tabla
 
 
-def _solo_lectura(columnas: list[str], estirar: int) -> QTableWidget:
-    resultado = tabla(columnas, estirar=estirar)
+def _solo_lectura(columnas: list[str], estirar: int, ordenable: bool = False) -> QTableWidget:
+    resultado = tabla(columnas, estirar=estirar, ordenable=ordenable)
     resultado.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
     resultado.setFocusPolicy(Qt.FocusPolicy.NoFocus)
     return resultado
@@ -37,11 +37,18 @@ class Tarjeta(QFrame):
         columna.addWidget(self.numero)
         columna.addWidget(QLabel(texto, objectName="tarjetaTexto"))
 
-    def poner(self, valor: int):
+    def poner(self, valor: int, alerta: bool = False):
         self.numero.setText(f"{valor:,}")
+        nombre = "tarjetaAlerta" if alerta else "tarjetaNumero"
+        if self.numero.objectName() != nombre:
+            self.numero.setObjectName(nombre)
+            self.numero.style().unpolish(self.numero)
+            self.numero.style().polish(self.numero)
 
 
 class PaginaInicio(QWidget):
+    ir_a_capturar = Signal(int, int)  # liga y torneo del partido atrasado más antiguo
+
     def __init__(self, conn: sqlite3.Connection):
         super().__init__()
         self.setObjectName("pagina")
@@ -60,11 +67,22 @@ class PaginaInicio(QWidget):
         self.equipos = Tarjeta("Equipos")
         self.jugadores = Tarjeta("Jugadores")
         self.por_jugar = Tarjeta("Partidos por jugar")
+        self.por_capturar = Tarjeta("Por capturar")
         self.jugados = Tarjeta("Partidos jugados")
         self.pospuestos = Tarjeta("Partidos pospuestos")
         tarjetas = QHBoxLayout()
-        for tarjeta in (self.equipos, self.jugadores, self.por_jugar, self.jugados, self.pospuestos):
+        for tarjeta in (
+            self.equipos, self.jugadores, self.por_jugar, self.por_capturar, self.jugados, self.pospuestos,
+        ):
             tarjetas.addWidget(tarjeta)
+
+        self.aviso = QFrame(objectName="avisoAtrasados")
+        self.aviso_texto = QLabel()
+        fila_aviso = QHBoxLayout(self.aviso)
+        fila_aviso.setContentsMargins(12, 6, 8, 6)
+        fila_aviso.addWidget(self.aviso_texto, 1)
+        fila_aviso.addWidget(boton("Capturar resultados", self._capturar))
+        self.aviso.setVisible(False)
 
         self.proximos = _solo_lectura(
             ["Día", "Hora", "Equipo", "Equipo", "Categoría", "Cancha"], estirar=2
@@ -95,7 +113,7 @@ class PaginaInicio(QWidget):
         columnas.addLayout(derecha, 2)
 
         self.ligas = _solo_lectura(
-            ["Liga", "Categorías", "Equipos", "Jugadores", "Por jugar", "Jugados", "Pospuestos"],
+            ["Liga", "Equipos", "Por jugar", "Por capturar", "Jugados", "Pospuestos"],
             estirar=0,
         )
         self.ligas.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -123,9 +141,15 @@ class PaginaInicio(QWidget):
         raiz.setContentsMargins(0, 0, 0, 0)
         raiz.addLayout(encabezado)
         raiz.addLayout(tarjetas)
+        raiz.addWidget(self.aviso)
         raiz.addLayout(columnas, 1)
         raiz.addLayout(abajo)
         self.refrescar()
+
+    def _capturar(self):
+        destino = inicio.primer_atrasado(self.conn, rol.hoy(), self.liga.currentData())
+        if destino:
+            self.ir_a_capturar.emit(*destino)
 
     def showEvent(self, evento):
         # Los datos pueden cambiar en cualquier página, así que se leen al volver aquí.
@@ -151,6 +175,14 @@ class PaginaInicio(QWidget):
         self.equipos.poner(sum(r.equipos for r in elegidas))
         self.jugadores.poner(sum(r.jugadores for r in elegidas))
         self.por_jugar.poner(sum(r.por_jugar for r in elegidas))
+        atrasados = sum(r.por_capturar for r in elegidas)
+        self.por_capturar.poner(atrasados, alerta=atrasados > 0)
+        self.aviso_texto.setText(
+            "1 partido ya pasó y no tiene resultado."
+            if atrasados == 1
+            else f"{atrasados} partidos ya pasaron y no tienen resultado."
+        )
+        self.aviso.setVisible(atrasados > 0)
         self.jugados.poner(sum(r.jugados for r in elegidas))
         self.pospuestos.poner(sum(r.pospuestos for r in elegidas))
 
@@ -191,8 +223,7 @@ class PaginaInicio(QWidget):
                 (
                     r.liga_id,
                     [
-                        r.nombre, r.categorias, r.equipos, r.jugadores,
-                        r.por_jugar, r.jugados, r.pospuestos,
+                        r.nombre, r.equipos, r.por_jugar, r.por_capturar, r.jugados, r.pospuestos,
                     ],
                 )
                 for r in resumen

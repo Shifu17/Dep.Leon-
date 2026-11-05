@@ -15,7 +15,8 @@ conviene seguirlos en orden la primera vez.
 8. [Llevar los cobros](#8-llevar-los-cobros)
 9. [Sacar reportes](#9-sacar-reportes)
 10. [Respaldos y actualizaciones](#10-respaldos-y-actualizaciones)
-11. [Si algo no sale](#11-si-algo-no-sale)
+11. [Atajos y búsqueda](#11-atajos-y-búsqueda)
+12. [Si algo no sale](#12-si-algo-no-sale)
 
 ## 1. Entrar al programa
 
@@ -98,6 +99,9 @@ En **Resultados**, selecciona un partido y pulsa **Capturar resultado**, o haz d
 - **Marcador y goleadores:** los goleadores son opcionales. Puede haber goles sin jugador, como un
   autogol, pero no más goles asignados que los del marcador.
 - **Corregir:** vuelve a capturar el partido. **Borrar resultado** lo regresa a por jugar.
+
+Los partidos cuya fecha ya pasó sin resultado aparecen como **Atrasado**. Inicio avisa cuántos hay y te lleva
+directo a capturarlos.
 
 Si un equipo no llegó, pulsa **No se presentó** y elige:
 
@@ -192,7 +196,23 @@ Ambas opciones están en **Configuración**.
 Con internet, el programa revisa si hay una versión nueva y te avisa. Solo se instala si aceptas, y antes
 crea un respaldo automático. Sin internet no ocurre nada y todo sigue funcionando.
 
-## 11. Si algo no sale
+## 11. Atajos y búsqueda
+
+La liga, el torneo y la categoría que eliges se conservan al cambiar de pantalla. Inicio tiene su propia
+vista.
+
+Pulsa el encabezado de una columna para ordenar la tabla, y vuelve a pulsarlo para invertir el orden. En
+Equipos, Rol, Resultados y Cobros puedes buscar por nombre; en Equipos también encuentra jugadores.
+
+| Tecla | Qué hace |
+|---|---|
+| **Ctrl+1** a **Ctrl+9** y **Ctrl+0** | Cambiar de pantalla, en el orden del menú |
+| **Ctrl+F** | Ir al buscador de la pantalla |
+| **F5** | Actualizar la pantalla |
+| **Tab** | Pasar al siguiente control |
+| **Enter** o doble clic en una fila | Hacer la acción principal: editar, capturar o registrar pago |
+
+## 12. Si algo no sale
 
 | Situación | Qué hacer |
 |---|---|

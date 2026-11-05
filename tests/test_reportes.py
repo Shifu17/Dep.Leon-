@@ -7,7 +7,6 @@ from datetime import date
 
 import pytest
 from PySide6.QtGui import QColor, QGuiApplication, QImage
-from PySide6.QtWidgets import QApplication
 
 from dep_leon import cobros, liguilla, lienzo, reportes, resultados, rol, updater
 from dep_leon.ui import pagina_reportes as ui_reportes
@@ -16,9 +15,9 @@ from dep_leon.ui.ventana import Ventana
 SABADO = date(2026, 11, 7)
 
 
-@pytest.fixture(scope="module", autouse=True)
-def app():
-    return QApplication.instance() or QApplication([])
+@pytest.fixture(autouse=True)
+def _aplicacion(app):
+    return app
 
 
 @pytest.fixture

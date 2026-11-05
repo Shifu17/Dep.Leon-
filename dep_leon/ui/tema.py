@@ -43,6 +43,8 @@ QLabel#titulo {{
 QLabel#tituloAcceso {{ color: {VERDE_ACTIVO}; font-size: 24px; font-weight: 600; }}
 QFrame#tarjeta {{ background: {BLANCO}; border: 1px solid {BORDE}; border-radius: 8px; }}
 QLabel#tarjetaNumero {{ color: {TEXTO}; font-size: 30px; font-weight: 600; }}
+QLabel#tarjetaAlerta {{ color: {ROJO}; font-size: 30px; font-weight: 600; }}
+QFrame#avisoAtrasados {{ background: {ROJO_SUAVE}; border: 1px solid {BORDE_PELIGRO}; border-radius: 6px; }}
 QLabel#tarjetaTexto {{ color: {TEXTO_SUAVE}; }}
 QSpinBox#marcador {{ font-size: 24px; font-weight: 600; }}
 QWidget#listaGoles {{ background: {BLANCO}; }}
