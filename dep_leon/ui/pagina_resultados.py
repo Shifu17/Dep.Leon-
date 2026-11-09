@@ -29,6 +29,7 @@ from .comun import (
     error,
     etiqueta,
     id_seleccionado,
+    listo,
     llenar,
     tabla,
 )
@@ -253,10 +254,15 @@ class PaginaResultados(QWidget):
         filtros.addWidget(self.ver, 1)
 
         acciones = QHBoxLayout()
-        acciones.addWidget(boton("Capturar resultado", self.capturar))
-        acciones.addWidget(boton("Pase de lista", self.pase_de_lista, "secundario"))
-        acciones.addWidget(boton("No se presentó", self.no_se_presento, "secundario"))
-        acciones.addWidget(boton("Borrar resultado", self.borrar, "peligro"))
+        for texto, accion, estilo, ayuda in (
+            ("Capturar resultado", self.capturar, None, "Anota el marcador, quién vino y quién anotó."),
+            ("Pase de lista", self.pase_de_lista, "secundario", "Anota quién llegó, aunque el partido no termine."),
+            ("No se presentó", self.no_se_presento, "secundario", "Da el partido por default o lo pospone."),
+            ("Borrar resultado", self.borrar, "peligro", "Regresa el partido a «por jugar»."),
+        ):
+            control = boton(texto, accion, estilo)
+            control.setToolTip(ayuda)
+            acciones.addWidget(control)
         acciones.addStretch(1)
         self.fila_acciones = acciones
 
@@ -338,18 +344,21 @@ class PaginaResultados(QWidget):
         partido = self._partido()
         if partido is not None and capturar_partido(self, self.conn, partido):
             self.refrescar_partidos()
+            listo(self, "resultado guardado.")
 
     def pase_de_lista(self):
         partido = self._partido()
-        if partido is not None:
-            pasar_lista(self, self.conn, _partido_completo(self.conn, partido))
+        if partido is not None and pasar_lista(self, self.conn, _partido_completo(self.conn, partido)):
+            listo(self, "pase de lista guardado.")
 
     def no_se_presento(self):
         partido = self._partido()
         if partido is not None and marcar_no_presentado(self, self.conn, partido):
             self.refrescar_partidos()
+            listo(self, "partido actualizado.")
 
     def borrar(self):
         partido = self._partido()
         if partido is not None and borrar_resultado(self, self.conn, partido):
             self.refrescar_partidos()
+            listo(self, "resultado borrado.")

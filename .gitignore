@@ -11,6 +11,8 @@ dist/
 *.db-shm
 fotos/
 *.xlsx
+# Excepción: el formato de hoja de registro, ya limpio de datos personales (scripts/plantilla_registro.py)
+!dep_leon/assets/hoja_registro.xlsx
 
 # Respaldos del programa
 Respaldo*.zip

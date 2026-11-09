@@ -398,10 +398,16 @@ def _registrar(
     torneo_id: int,
     fotos_dir: Path,
     fotos_copiadas: list[Path],
-    responsable: str = "",
+    personal: dict[str, str] | None = None,
 ) -> tuple[int, int, int]:
-    """Guarda las filas válidas; quien llama abre y cierra la transacción."""
+    """Guarda las filas válidas; quien llama abre y cierra la transacción.
+
+    `personal` trae responsable (entrenador), asistente y director: lo que venga lleno actualiza al equipo.
+    """
+    personal = {k: v for k, v in (personal or {}).items() if v}
+    assert set(personal) <= {"responsable", "asistente", "director"}  # nombres de columna fijos
     nuevos = actualizados = equipos_creados = 0
+    actualizados_personal: set = set()
     equipos = {
         (e["categoria_id"], _clave(e["nombre"])): e["id"]
         for e in conn.execute("SELECT * FROM equipos WHERE torneo_id = ?", (torneo_id,))
@@ -413,15 +419,15 @@ def _registrar(
         equipo_id = equipos.get(clave)
         if equipo_id is None:
             equipo_id = conn.execute(
-                "INSERT INTO equipos (torneo_id, categoria_id, nombre, responsable) VALUES (?, ?, ?, ?)",
-                (torneo_id, fila.categoria_id, fila.equipo, responsable),
+                "INSERT INTO equipos (torneo_id, categoria_id, nombre) VALUES (?, ?, ?)",
+                (torneo_id, fila.categoria_id, fila.equipo),
             ).lastrowid
             equipos[clave] = equipo_id
             equipos_creados += 1
-        elif responsable:
-            conn.execute(
-                "UPDATE equipos SET responsable = ? WHERE id = ? AND responsable = ''", (responsable, equipo_id)
-            )
+        if clave not in actualizados_personal and personal:
+            actualizados_personal.add(clave)
+            for columna, valor in personal.items():
+                conn.execute(f"UPDATE equipos SET {columna} = ? WHERE id = ?", (valor, equipo_id))
 
         foto = ""
         if fila.foto is not None:

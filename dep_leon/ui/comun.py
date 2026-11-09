@@ -152,6 +152,14 @@ def fila_con_error(forma, titulo: str, campo: QWidget) -> AvisoCampo:
     return aviso
 
 
+def listo(widget: QWidget, texto: str) -> None:
+    """Confirma en la barra inferior de la ventana que algo se guardó, sin interrumpir con un mensaje."""
+    ventana = widget.window()
+    barra = getattr(ventana, "statusBar", None)
+    if callable(barra):
+        barra().showMessage(f"Listo: {texto}", 6000)
+
+
 def ayuda_pagina(texto: str) -> QLabel:
     """Una línea bajo el título que dice para qué sirve la pantalla y por dónde empezar."""
     return QLabel(texto, objectName="ayudaPagina", wordWrap=True)
@@ -292,6 +300,12 @@ def al_activar(tabla_: QTableWidget, accion) -> None:
         atajo = QShortcut(QKeySequence(tecla), tabla_)
         atajo.setContext(Qt.ShortcutContext.WidgetShortcut)
         atajo.activated.connect(accion)
+
+
+def id_seleccionado_en(tabla_: QTableWidget, fila: int):
+    """El id guardado en un renglón de la tabla, esté elegido o no."""
+    celda = tabla_.item(fila, 0)
+    return None if celda is None else celda.data(Qt.ItemDataRole.UserRole)
 
 
 def id_seleccionado(tabla_: QTableWidget) -> int | None:

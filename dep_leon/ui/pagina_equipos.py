@@ -44,7 +44,9 @@ from .comun import (
     fila_con_error,
     filtrar,
     id_seleccionado,
+    id_seleccionado_en,
     info,
+    listo,
     llenar,
     poner_vacio,
     tabla,
@@ -61,13 +63,17 @@ class DialogoEquipo(QDialog):
             self.categoria.addItem(c["nombre"], c["id"])
         self.nombre = QLineEdit(equipo["nombre"] if equipo else "")
         self.responsable = QLineEdit(equipo["responsable"] if equipo else "")
+        self.asistente = QLineEdit(equipo["asistente"] if equipo else "")
+        self.director = QLineEdit(equipo["director"] if equipo else "")
         self.telefono = QLineEdit(equipo["telefono"] if equipo else "")
         if equipo:
             self.categoria.setCurrentIndex(self.categoria.findData(equipo["categoria_id"]))
         forma = QFormLayout(self)
         forma.addRow("Categoría:", self.categoria)
         self.error_nombre = fila_con_error(forma, "Nombre:", self.nombre)
-        forma.addRow("Responsable:", self.responsable)
+        forma.addRow("Entrenador:", self.responsable)
+        forma.addRow("Asistente:", self.asistente)
+        forma.addRow("Director general:", self.director)
         forma.addRow("Teléfono:", self.telefono)
         forma.addRow(botones_dialogo(self, self._aceptar))
 
@@ -515,10 +521,25 @@ class PaginaEquipos(QWidget):
         self.filtros.cambiado.connect(self.refrescar_equipos)
 
         excel_fila = QHBoxLayout()
-        excel_fila.addWidget(boton("Importar Excel", self.importar_excel, "secundario"))
+        importar = boton("Importar Excel", self.importar_excel, "secundario")
+        importar.setToolTip("Registra equipos y jugadores desde las hojas de registro de los clubes, con sus fotos.")
+        exportar = boton_mas(
+            "Exportar Excel",
+            [
+                ("Solo el equipo elegido", self.exportar_registro),
+                ("Todos los equipos de la lista (un archivo por equipo)", self.exportar_todos),
+            ],
+        )
+        exportar.setToolTip("Guarda la hoja de registro con el mismo formato de los clubes: jugadores, "
+                            "pase de lista y credenciales con foto.")
+        credenciales_pdf = boton("Credenciales PDF", self.generar_credenciales, "secundario")
+        credenciales_pdf.setToolTip("Credenciales del equipo elegido, listas para imprimir y recortar.")
+        excel_fila.addWidget(importar)
+        excel_fila.addWidget(exportar)
+        excel_fila.addWidget(credenciales_pdf)
         excel_fila.addStretch(1)
 
-        self.tabla_equipos = tabla(["Equipo", "Categoría", "Jugadores", "Disponible"], estirar=0)
+        self.tabla_equipos = tabla(["Equipo", "Categoría", "Jugadores", "Puede jugar"], estirar=0)
         self.tabla_jugadores = tabla(
             ["Núm.", "Jugador", "Nacimiento", "Posición", "Asistencias", "Foto"], estirar=1
         )
@@ -534,16 +555,13 @@ class PaginaEquipos(QWidget):
         izquierda.addWidget(QLabel("Equipos", objectName="seccion"))
         izquierda.addWidget(self.tabla_equipos)
         fila = QHBoxLayout()
-        fila.addWidget(boton("Agregar", self.nuevo_equipo))
+        fila.addWidget(boton("Agregar equipo", self.nuevo_equipo))
         fila.addWidget(boton("Editar", self.editar_equipo, "secundario"))
-        fila.addWidget(boton("Pase de lista", self.pase_de_lista, "secundario"))
         fila.addWidget(
             boton_mas(
                 "Más opciones",
                 [
                     ("Días y horas en que puede jugar", self.editar_disponibilidad),
-                    ("Credenciales en PDF", self.generar_credenciales),
-                    ("Hoja de registro en Excel (con pase de lista)", self.exportar_registro),
                     ("Descargar plantilla de Excel vacía", self.descargar_plantilla),
                     ("Eliminar equipo", self.borrar_equipo),
                 ],
@@ -556,9 +574,12 @@ class PaginaEquipos(QWidget):
         derecha.addWidget(QLabel("Jugadores del equipo", objectName="seccion"))
         derecha.addWidget(self.tabla_jugadores)
         fila = QHBoxLayout()
-        fila.addWidget(boton("Agregar", self.nuevo_jugador))
+        fila.addWidget(boton("Agregar jugador", self.nuevo_jugador))
         fila.addWidget(boton("Editar", self.editar_jugador, "secundario"))
         fila.addWidget(boton("Eliminar", self.borrar_jugador, "peligro"))
+        lista = boton("Pase de lista", self.pase_de_lista, "secundario")
+        lista.setToolTip("Asistencia de los jugadores del equipo en cada partido (J1, J2...).")
+        fila.addWidget(lista)
         fila.addStretch(1)
         derecha.addLayout(fila)
 
@@ -652,6 +673,12 @@ class PaginaEquipos(QWidget):
             else "Primero crea un torneo en «Ligas y categorías».",
         )
         filtrar(self.tabla_equipos, self.busqueda.text(), self._equipos_con_jugador(self.busqueda.text()))
+        if id_seleccionado(self.tabla_equipos) is None:
+            # Con un equipo ya elegido, sus jugadores se ven de inmediato y los botones funcionan.
+            for r in range(self.tabla_equipos.rowCount()):
+                if not self.tabla_equipos.isRowHidden(r):
+                    self.tabla_equipos.selectRow(r)
+                    break
         self.refrescar_jugadores()
 
     def refrescar_jugadores(self):
@@ -681,15 +708,16 @@ class PaginaEquipos(QWidget):
         )
         poner_vacio(
             self.tabla_jugadores,
-            "Este equipo no tiene jugadores. Pulsa «Agregar»."
+            "Este equipo no tiene jugadores. Pulsa «Agregar jugador» o importa su hoja de registro."
             if id_seleccionado(self.tabla_equipos)
             else "Selecciona un equipo para ver sus jugadores.",
         )
         self._filtrar_jugadores()
 
-    def _avisar_cambio(self):
+    def _avisar_cambio(self, mensaje: str = "cambios guardados."):
         self.refrescar_equipos()
         self.datos_cambiados.emit()
+        listo(self, mensaje)
 
     def nuevo_equipo(self):
         if self._torneo_id() is None:
@@ -702,7 +730,7 @@ class PaginaEquipos(QWidget):
         dialogo = DialogoEquipo(self, categorias)
         if dialogo.exec():
             self._guardar_equipo(
-                "INSERT INTO equipos (categoria_id, nombre, responsable, telefono, torneo_id) "
+                "INSERT INTO equipos (categoria_id, nombre, responsable, telefono, asistente, director, torneo_id) "
                 "VALUES (?, ?, ?, ?, ?)",
                 dialogo, self._torneo_id(),
             )
@@ -719,7 +747,8 @@ class PaginaEquipos(QWidget):
                 error(self, "No se puede cambiar de categoría: el equipo ya tiene partidos en el rol.")
                 return
             self._guardar_equipo(
-                "UPDATE equipos SET categoria_id = ?, nombre = ?, responsable = ?, telefono = ? "
+                "UPDATE equipos SET categoria_id = ?, nombre = ?, responsable = ?, telefono = ?, "
+                "asistente = ?, director = ? "
                 "WHERE id = ?",
                 dialogo, equipo_id,
             )
@@ -731,13 +760,14 @@ class PaginaEquipos(QWidget):
                     sql,
                     (
                         dialogo.categoria.currentData(), dialogo.nombre.text().strip(),
-                        dialogo.responsable.text().strip(), dialogo.telefono.text().strip(), ultimo,
+                        dialogo.responsable.text().strip(), dialogo.telefono.text().strip(),
+                        dialogo.asistente.text().strip(), dialogo.director.text().strip(), ultimo,
                     ),
                 )
         except sqlite3.IntegrityError:
             error(self, "Ya existe un equipo con ese nombre en esa categoría.")
             return
-        self._avisar_cambio()
+        self._avisar_cambio("equipo guardado.")
 
     def editar_disponibilidad(self):
         equipo_id = id_seleccionado(self.tabla_equipos)
@@ -748,7 +778,7 @@ class PaginaEquipos(QWidget):
         dialogo = DialogoDisponibilidad(self, nombre, rol.disponibilidad_de_equipo(self.conn, equipo_id))
         if dialogo.exec():
             rol.guardar_disponibilidad(self.conn, equipo_id, dialogo.valores())
-            self._avisar_cambio()
+            self._avisar_cambio("días y horas guardados.")
 
     def borrar_equipo(self):
         equipo_id = id_seleccionado(self.tabla_equipos)
@@ -774,7 +804,7 @@ class PaginaEquipos(QWidget):
             self.conn.execute("DELETE FROM equipos WHERE id = ?", (equipo_id,))
         for f in fotos:
             borrar_foto(f["foto"], fotos_dir())
-        self._avisar_cambio()
+        self._avisar_cambio("equipo eliminado.")
 
     def _tiene_partidos(self, equipo_id) -> bool:
         return (
@@ -847,7 +877,7 @@ class PaginaEquipos(QWidget):
             return
         if foto_nueva and foto:
             borrar_foto(foto, fotos_dir())
-        self._avisar_cambio()
+        self._avisar_cambio("jugador guardado.")
 
     def borrar_jugador(self):
         jugador_id = id_seleccionado(self.tabla_jugadores)
@@ -863,7 +893,7 @@ class PaginaEquipos(QWidget):
         with self.conn:
             self.conn.execute("DELETE FROM jugadores WHERE id = ?", (jugador_id,))
         borrar_foto(foto["foto"], fotos_dir())
-        self._avisar_cambio()
+        self._avisar_cambio("jugador eliminado.")
 
     def descargar_plantilla(self):
         if self._liga_id() is None:
@@ -911,7 +941,7 @@ class PaginaEquipos(QWidget):
         nuevos, actualizados, equipos, categorias = registro.importar(
             self.conn, registros, self._torneo_id(), fotos_dir()
         )
-        self._avisar_cambio()
+        self._avisar_cambio("importación terminada.")
         lineas = [
             f"Importación terminada en el torneo «{self.torneo.currentText()}».", "",
             f"Equipos creados: {equipos}", f"Jugadores nuevos: {nuevos}",
@@ -933,7 +963,7 @@ class PaginaEquipos(QWidget):
         if not DialogoImportacion(self, filas).exec():
             return
         nuevos, actualizados, equipos = excel.importar(self.conn, filas, self._torneo_id(), fotos_dir())
-        self._avisar_cambio()
+        self._avisar_cambio("importación terminada.")
         info(
             self,
             f"Importación terminada en el torneo «{self.torneo.currentText()}».\n\n"
@@ -961,6 +991,7 @@ class PaginaEquipos(QWidget):
             return
         if DialogoListaEquipo(self, self.conn, equipo_id, nombre).exec():
             self.refrescar_jugadores()
+            listo(self, f"pase de lista de «{nombre}» guardado.")
 
     def exportar_registro(self):
         elegido = self._equipo_elegido()
@@ -972,11 +1003,39 @@ class PaginaEquipos(QWidget):
         if not ruta:
             return
         try:
-            registro.exportar(self.conn, equipo_id, ruta)
+            registro.exportar(self.conn, equipo_id, ruta, fotos_dir())
         except PermissionError:
-            error(self, "No se pudo guardar: el archivo está abierto en Excel.")
+            error(self, "No se pudo guardar: el archivo está abierto en Excel. Ciérralo e inténtalo de nuevo.")
             return
+        listo(self, f"hoja de registro de «{nombre}» guardada.")
         os.startfile(ruta)
+
+    def exportar_todos(self):
+        equipos = [
+            (id_seleccionado_en(self.tabla_equipos, r), self.tabla_equipos.item(r, 0).text(),
+             self.tabla_equipos.item(r, 1).text())
+            for r in range(self.tabla_equipos.rowCount())
+            if not self.tabla_equipos.isRowHidden(r)
+        ]
+        if not equipos:
+            error(self, "No hay equipos en la lista para exportar.")
+            return
+        carpeta = QFileDialog.getExistingDirectory(self, "Elige la carpeta donde guardar los archivos", str(Path.home()))
+        if not carpeta:
+            return
+        guardados, abiertos = 0, []
+        for equipo_id, nombre, categoria in equipos:
+            ruta = Path(carpeta) / f"Registro {_nombre_archivo(nombre)} - {_nombre_archivo(categoria)}.xlsx"
+            try:
+                registro.exportar(self.conn, equipo_id, ruta, fotos_dir())
+                guardados += 1
+            except PermissionError:
+                abiertos.append(ruta.name)
+        mensaje = f"Se guardaron {guardados} hojas de registro en:\n{carpeta}"
+        if abiertos:
+            mensaje += "\n\nNo se pudieron guardar porque están abiertas en Excel:\n" + "\n".join(abiertos)
+        info(self, mensaje)
+        os.startfile(carpeta)
 
     def generar_credenciales(self):
         equipo_id = id_seleccionado(self.tabla_equipos)

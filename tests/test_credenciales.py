@@ -13,7 +13,7 @@ def test_genera_pdf_con_y_sin_foto_y_varias_hojas(conn, infantil_id, torneo_id, 
             "INSERT INTO equipos (torneo_id, categoria_id, nombre) VALUES (?, ?, 'Pegasos')",
             (torneo_id, categoria),
         ).lastrowid
-        for numero in range(9):  # caben 8 por hoja
+        for numero in range(11):  # caben 10 por hoja, como en la cédula
             conn.execute(
                 "INSERT INTO jugadores (equipo_id, nombre, fecha_nacimiento, numero, foto) "
                 "VALUES (?, ?, '2015-03-15', ?, ?)",
@@ -21,7 +21,7 @@ def test_genera_pdf_con_y_sin_foto_y_varias_hojas(conn, infantil_id, torneo_id, 
             )
 
     destino = tmp_path / "c.pdf"
-    assert credenciales.generar(conn, equipo, destino, tmp_path) == 9
+    assert credenciales.generar(conn, equipo, destino, tmp_path) == 11
     contenido = destino.read_bytes()
     assert contenido.startswith(b"%PDF")
     assert contenido.count(b"/Type /Page\n") + contenido.count(b"/Type /Page ") >= 2

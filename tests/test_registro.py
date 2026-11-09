@@ -199,7 +199,7 @@ def test_exportar_registro_marca_el_pase_de_lista(conn, partido, tmp_path):
     p1, _ = _jugadores(conn, pumas)
     asistencia.guardar(conn, partido_id, {p1})
     destino = tmp_path / "salida.xlsx"
-    registro.exportar(conn, pumas, destino)
+    registro.exportar(conn, pumas, destino, tmp_path)
 
     hoja = load_workbook(destino).active
     assert hoja["C3"].value == "Pumas" and hoja["G7"].value == "J1"
@@ -221,8 +221,10 @@ def test_migra_una_base_anterior_sin_perder_goles(tmp_path):
     """Hasta la 0.9.5 el número era obligatorio y no existía la CURP."""
     ruta = tmp_path / "vieja.db"
     vieja = sqlite3.connect(ruta)
-    esquema_viejo = db.ESQUEMA.replace("    numero INTEGER,\n", "    numero INTEGER NOT NULL,\n").replace(
-        "    curp TEXT NOT NULL DEFAULT '',\n", ""
+    esquema_viejo = (
+        db.ESQUEMA.replace("    numero INTEGER,\n", "    numero INTEGER NOT NULL,\n")
+        .replace("    curp TEXT NOT NULL DEFAULT '',\n", "")
+        .replace("    asistente TEXT NOT NULL DEFAULT '',\n    director TEXT NOT NULL DEFAULT '',\n", "")
     )
     vieja.executescript(esquema_viejo)
     with vieja:
@@ -241,6 +243,7 @@ def test_migra_una_base_anterior_sin_perder_goles(tmp_path):
     conn = db.conectar(ruta)
     columnas = {c["name"]: c["notnull"] for c in conn.execute("PRAGMA table_info(jugadores)")}
     assert columnas["numero"] == 0 and "curp" in columnas
+    assert {"asistente", "director"} <= {c["name"] for c in conn.execute("PRAGMA table_info(equipos)")}
     assert tuple(conn.execute("SELECT nombre, numero, curp FROM jugadores").fetchone()) == ("Ana", 7, "")
     assert conn.execute("SELECT cantidad FROM goles").fetchone()[0] == 2
     with pytest.raises(sqlite3.IntegrityError):  # los goles siguen protegiendo al jugador
@@ -324,3 +327,81 @@ def test_pase_de_lista_desde_resultados(app, conn, partido):
     assert dialogo.local.contador.text() == "Vinieron 2 de 2 jugadores."
     dialogo._aceptar()
     assert asistencia.presentes(conn, partido_id) == set(_jugadores(conn, pumas))
+
+
+def test_exportar_con_el_formato_de_los_clubes_y_sus_fotos(conn, partido, tmp_path):
+    from PIL import Image
+
+    _, pumas, _ = partido
+    p1, _ = _jugadores(conn, pumas)
+    fotos = tmp_path / "fotos"
+    fotos.mkdir()
+    Image.new("RGB", (300, 300), "red").save(fotos / "roja.jpg")
+    with conn:
+        conn.execute("UPDATE jugadores SET foto = 'roja.jpg', numero = 9 WHERE id = ?", (p1,))
+        conn.execute("UPDATE equipos SET responsable = 'Entrenador X', director = 'Director Y' WHERE id = ?", (pumas,))
+    destino = tmp_path / "pumas.xlsx"
+    registro.exportar(conn, pumas, destino, fotos)
+
+    libro = load_workbook(destino)
+    hoja = libro["Hoja de Registro"]
+    assert (hoja["B3"].value, hoja["C3"].value, hoja["C5"].value) == ("NOMBRE DEL CLUB", "Pumas", "VARONIL")
+    assert hoja["C31"].value == "Entrenador X" and hoja["C33"].value == "Director Y"
+    cedula = libro["Cédula"]
+    assert cedula["B3"].value == "=+'Hoja de Registro'!C8"  # la cédula sigue armada con fórmulas
+    assert any("COPA DE VERANO" in str(c.value) for fila in cedula.iter_rows() for c in fila)
+
+    (vuelta,) = registro.leer([destino])
+    assert vuelta.director == "Director Y"
+    renglon_p1 = next(r for r, v in vuelta.crudos if v["nombre"] == "Pumas uno")
+    assert set(vuelta.fotos) == {renglon_p1}  # el escudo repetido no se confunde con una foto
+
+
+def test_reimportar_actualiza_personal_y_foto(conn, partido, tmp_path):
+    from PIL import Image
+
+    _, pumas, _ = partido
+    p1, _ = _jugadores(conn, pumas)
+    fotos = tmp_path / "fotos"
+    fotos.mkdir()
+    Image.new("RGB", (300, 400), "blue").save(fotos / "azul.jpg")
+    with conn:
+        conn.execute("UPDATE jugadores SET foto = 'azul.jpg' WHERE id = ?", (p1,))
+        conn.execute("UPDATE equipos SET director = 'Nuevo director' WHERE id = ?", (pumas,))
+    destino = tmp_path / "pumas.xlsx"
+    registro.exportar(conn, pumas, destino, fotos)
+    with conn:
+        conn.execute("UPDATE equipos SET director = '' WHERE id = ?", (pumas,))
+
+    registros = registro.leer([destino])
+    torneo = conn.execute("SELECT torneo_id FROM equipos WHERE id = ?", (pumas,)).fetchone()[0]
+    registro.preparar(conn, registros, torneo)
+    registro.importar(conn, registros, torneo, fotos)
+    assert conn.execute("SELECT director FROM equipos WHERE id = ?", (pumas,)).fetchone()[0] == "Nuevo director"
+    nueva = conn.execute("SELECT foto FROM jugadores WHERE id = ?", (p1,)).fetchone()[0]
+    assert nueva != "azul.jpg" and (fotos / nueva).is_file()
+    assert not (fotos / "azul.jpg").exists()  # la foto anterior no se queda huérfana
+
+
+def test_credenciales_con_el_acomodo_de_la_cedula(conn, partido, tmp_path):
+    from dep_leon import credenciales
+
+    _, pumas, _ = partido
+    destino = tmp_path / "cred.pdf"
+    assert credenciales.generar(conn, pumas, destino, tmp_path) == 2
+    contenido = destino.read_bytes()
+    assert contenido.startswith(b"%PDF") and len(contenido) > 1000
+    assert credenciales.rama("Femenil Libre") == "FEMENIL" and credenciales.rama("Infantil 2015") == "VARONIL"
+
+
+def test_confirmacion_en_la_barra_inferior(app):
+    from PySide6.QtWidgets import QLabel, QMainWindow
+
+    from dep_leon.ui.comun import listo
+
+    ventana = QMainWindow()
+    contenido = QLabel("x")
+    ventana.setCentralWidget(contenido)
+    listo(contenido, "jugador guardado.")
+    assert ventana.statusBar().currentMessage() == "Listo: jugador guardado."
+    listo(QLabel("suelta"), "sin ventana principal")  # no falla fuera de la ventana principal

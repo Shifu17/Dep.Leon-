@@ -204,5 +204,7 @@ QComboBox QAbstractItemView {{
     background: {BLANCO}; color: {TEXTO};
     selection-background-color: {VERDE_SUAVE}; selection-color: {TEXTO};
 }}
+QStatusBar {{ background: {VERDE_SUAVE}; color: {TEXTO}; font-weight: 600; min-height: 26px; }}
+QStatusBar QLabel {{ background: transparent; }}
 QToolTip {{ background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE}; }}
 """

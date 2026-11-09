@@ -55,7 +55,8 @@ Entra a **Equipos y jugadores** y elige liga y torneo. Hay dos formas de registr
 
 Es el Excel que entrega cada club: **NOMBRE DEL CLUB**, **CATEGORÍA** y **RAMA** arriba; abajo la lista con
 **NO. PLAYERA**, **NOMBRE COMPLETO**, **FECHA DE NACIMIENTO**, **CURP** y las columnas J1, J2…; al final
-el entrenador.
+el entrenador, el asistente y el director general. Si trae la hoja **Cédula** con las fotos de las
+credenciales, las fotos también se importan.
 
 1. Pulsa **Importar Excel** y elige uno o **varios** archivos a la vez (mantén Ctrl para elegir varios).
    Cada hoja de registro es un equipo, de la categoría que sea.
@@ -66,9 +67,30 @@ el entrenador.
 3. Toca un equipo para ver sus jugadores. Los que tienen error salen en rojo y no se registran.
 4. Pulsa **Importar**.
 
-El equipo se crea solo y el entrenador queda como responsable. El número de playera y la CURP son
-opcionales: un jugador sin número aparece como «Sin número». Si vuelves a importar el mismo archivo, los
-jugadores se actualizan, no se duplican, y un dato vacío no borra lo que ya tenías.
+El equipo se crea solo con su entrenador, asistente y director general. El número de playera y la CURP
+son opcionales: un jugador sin número aparece como «Sin número».
+
+**Para actualizar los datos**, vuelve a importar la hoja de registro corregida: los jugadores se
+actualizan (número, CURP y foto), no se duplican, y el personal del equipo se reemplaza por el del
+archivo. Un dato vacío en el archivo no borra lo que ya tenías.
+
+### Exportar la hoja de registro
+
+Pulsa **Exportar Excel** y elige:
+
+- **Solo el equipo elegido**, o
+- **Todos los equipos de la lista**: guarda un archivo por equipo en la carpeta que elijas (usa el filtro
+  de categoría para exportar solo una).
+
+El archivo tiene el **mismo formato** que entregan los clubes: la hoja **Hoja de Registro** con los datos,
+los jugadores y el pase de lista marcado en J1, J2…, y la hoja **Cédula** con las credenciales armadas,
+con escudo y foto de cada jugador. Se puede volver a importar.
+
+### Credenciales
+
+Pulsa **Credenciales PDF** con el equipo elegido. Salen con el acomodo de la cédula de los clubes: escudos,
+foto, nombre, CURP, club, fecha de nacimiento, categoría, rama, número de playera, entrenador y director
+general. Caben 10 por hoja carta, con una línea gris para recortar.
 
 ### Desde la plantilla del programa
 
@@ -81,7 +103,10 @@ repita el número de playera en un equipo.
 
 ### A mano
 
-Agrega el equipo y, con el equipo seleccionado, agrega cada jugador.
+Pulsa **Agregar equipo** (nombre, categoría, entrenador, asistente, director general y teléfono) y, con el
+equipo elegido, **Agregar jugador**.
+
+Cada vez que guardas algo, la barra verde de abajo lo confirma, por ejemplo «Listo: jugador guardado.».
 
 ### Pase de lista
 
@@ -92,18 +117,16 @@ pasó lista). Hay tres formas de pasar lista:
   llegó antes de que termine el partido.
 - **Al capturar el resultado:** junto a los goles de cada jugador está la casilla **¿Quién vino?**. Quien
   anota gol queda marcado solo.
-- **Por equipo, en Equipos y jugadores:** con el equipo seleccionado, pulsa **Pase de lista**. Verás una
-  cuadrícula como la de la hoja de registro: un renglón por jugador y una columna por partido (J1, J2…).
-  Haz clic en la celda para marcar «Sí» y otro clic para quitarlo.
+- **Por equipo, en Equipos y jugadores:** pulsa **Pase de lista**, junto a los botones de jugadores. Verás
+  una cuadrícula como la de la hoja de registro: un renglón por jugador y una columna por partido (J1,
+  J2…). Haz clic en la celda para marcar «Sí» y otro clic para quitarlo.
 
 ### Otras acciones del equipo
 
 En **Más opciones**, con el equipo seleccionado:
 
 - **Días y horas en que puede jugar:** si no marcas nada, puede jugar siempre.
-- **Credenciales en PDF:** genera las credenciales del equipo, 8 por hoja, con número y CURP si los tiene.
-- **Hoja de registro en Excel (con pase de lista):** guarda el equipo con el mismo formato de los clubes y
-  la asistencia de cada partido marcada, lista para imprimir.
+- **Descargar plantilla de Excel vacía**.
 - **Eliminar equipo**.
 
 ## 4. Generar el rol de juegos

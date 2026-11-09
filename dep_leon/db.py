@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS equipos (
     nombre TEXT NOT NULL,
     responsable TEXT NOT NULL DEFAULT '',
     telefono TEXT NOT NULL DEFAULT '',
+    asistente TEXT NOT NULL DEFAULT '',
+    director TEXT NOT NULL DEFAULT '',
     UNIQUE (torneo_id, categoria_id, nombre)
 );
 CREATE TABLE IF NOT EXISTS jugadores (
@@ -217,11 +219,19 @@ TABLA_JUGADORES = """CREATE TABLE jugadores (
 
 
 def _migrar(conn: sqlite3.Connection) -> None:
-    """Pone al día una base de una versión anterior sin perder datos.
+    """Pone al día una base de una versión anterior sin perder datos."""
+    # Hasta la 0.9.6 el equipo solo guardaba un responsable; la hoja de registro trae más personal.
+    del_equipo = {c["name"] for c in conn.execute("PRAGMA table_info(equipos)")}
+    for columna in ("asistente", "director"):
+        if columna not in del_equipo:
+            with conn:
+                conn.execute(f"ALTER TABLE equipos ADD COLUMN {columna} TEXT NOT NULL DEFAULT ''")
+    _migrar_jugadores(conn)
 
-    Hasta la versión 0.9.5 el número de playera era obligatorio y no se guardaba la CURP; las hojas
-    de registro de los equipos suelen traer jugadores sin número.
-    """
+
+def _migrar_jugadores(conn: sqlite3.Connection) -> None:
+    """Hasta la 0.9.5 el número de playera era obligatorio y no se guardaba la CURP; las hojas de
+    registro de los equipos suelen traer jugadores sin número."""
     columnas = {c["name"]: c for c in conn.execute("PRAGMA table_info(jugadores)")}
     if "curp" in columnas and not columnas["numero"]["notnull"]:
         return
