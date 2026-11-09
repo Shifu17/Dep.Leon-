@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QIcon, QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QGuiApplication, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 from .. import __version__, db, updater
 from ..paths import asset, data_dir, fotos_dir
 from .acceso import pedir_acceso
-from .comun import error, info
+from .comun import error, info, logo
 from .pagina_cobros import PaginaCobros
 from .pagina_config import PaginaConfig
 from .pagina_equipos import PaginaEquipos
@@ -34,8 +34,12 @@ from .pagina_liguilla import PaginaLiguilla
 from .pagina_reportes import PaginaReportes
 from .pagina_resultados import VER_POR_CAPTURAR, PaginaResultados
 from .pagina_rol import PaginaRol
+from .tema import ESCALA_TEXTO
 
-ANCHO_BARRA = 220
+ANCHO_BARRA = round(220 * min(ESCALA_TEXTO, 1.5))  # crece con el texto para no cortar el menú
+ALTO_LOGO = 200  # el escudo es vertical: se limita su alto para que la navegación quepa
+ALTO_LOGO_COMPACTO = 160  # en pantallas bajas, como las laptops de 768 px
+TAMANO_PREFERIDO = (1200, 760)
 MINUTOS_ENTRE_REVISIONES = 30
 
 
@@ -54,7 +58,7 @@ class Ventana(QMainWindow):
         super().__init__()
         self.setWindowTitle(f"Deportivo León - v{__version__}")
         self.setWindowIcon(QIcon(str(asset("icono.ico"))))
-        self.resize(1200, 760)
+        self._ajustar_a_pantalla()
         self.conn = conn
         self._avisada: str | None = None
         self._progreso: QProgressDialog | None = None
@@ -114,6 +118,19 @@ class Ventana(QMainWindow):
         if updater.puede_instalar():
             threading.Thread(target=updater.limpiar_restos, daemon=True).start()
 
+    def _ajustar_a_pantalla(self):
+        """Abre en el tamaño preferido sin pasar del área libre de la pantalla (sin barra de tareas)."""
+        pantalla = QGuiApplication.primaryScreen()
+        if pantalla is None:
+            self.resize(*TAMANO_PREFERIDO)
+            return
+        libre = pantalla.availableGeometry()
+        # El marco de la ventana (título y bordes) también ocupa lugar.
+        ancho = min(TAMANO_PREFERIDO[0], libre.width() - 16)
+        alto = min(TAMANO_PREFERIDO[1], libre.height() - 48)
+        self.resize(ancho, alto)
+        self.move(libre.x() + (libre.width() - ancho) // 2, libre.y() + max(0, (libre.height() - alto - 32) // 2))
+
     def _crear_barra(self) -> QWidget:
         barra = QWidget(objectName="barra")
         barra.setFixedWidth(ANCHO_BARRA)
@@ -122,13 +139,9 @@ class Ventana(QMainWindow):
         columna.setSpacing(0)
         grupo = QButtonGroup(self, exclusive=True)
 
-        logo = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
-        logo.setPixmap(
-            QPixmap(str(asset("logo.png"))).scaledToWidth(
-                ANCHO_BARRA - 28, Qt.TransformationMode.SmoothTransformation
-            )
-        )
-        columna.addWidget(logo)
+        pantalla = QGuiApplication.primaryScreen()
+        baja = pantalla is not None and pantalla.availableGeometry().height() < 820
+        columna.addWidget(logo(ANCHO_BARRA - 28, ALTO_LOGO_COMPACTO if baja else ALTO_LOGO))
         columna.addSpacing(14)
 
         def agregar(texto: str, pagina: QWidget):

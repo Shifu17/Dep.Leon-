@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="dep_leon/assets/logo.png" alt="Escudo de Deportivo León, Saltillo A.C." width="220">
+  <img src="docs/img/logo.png" alt="Escudo de Deportivo León, Saltillo A.C." width="180">
 
   <h1>Deportivo León</h1>
 

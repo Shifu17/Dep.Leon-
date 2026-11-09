@@ -3,7 +3,7 @@
 import sqlite3
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QGuiApplication, QIcon, QPixmap
+from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -19,11 +19,12 @@ from PySide6.QtWidgets import (
 
 from .. import acceso
 from ..paths import asset
-from .comun import AvisoCampo, botones_dialogo, error, info
+from .comun import AvisoCampo, botones_dialogo, error, info, logo
 
 MAX_INTENTOS = 5
 ESPERA_SEGUNDOS = 30
-ANCHO_LOGO = 270
+ANCHO_LOGO = 230
+ALTO_LOGO = 350
 
 
 def _boton(texto: str, al_pulsar, estilo: str | None = None) -> QPushButton:
@@ -102,10 +103,8 @@ class DialogoAcceso(QDialog):
         panel = QWidget(objectName="panelLogo")
         panel.setFixedWidth(ANCHO_LOGO + 60)
         columna = QVBoxLayout(panel)
-        logo = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
-        logo.setPixmap(QPixmap(str(asset("logo.png"))))
         columna.addStretch(1)
-        columna.addWidget(logo)
+        columna.addWidget(logo(ANCHO_LOGO, ALTO_LOGO))
         columna.addStretch(1)
 
         self.pila = QStackedWidget()

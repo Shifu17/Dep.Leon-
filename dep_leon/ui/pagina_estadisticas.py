@@ -23,7 +23,7 @@ from .filtros import FiltrosLiga
 def _solo_lectura(columnas: list[str], estirar: int) -> QTableWidget:
     resultado = tabla(columnas, estirar=estirar)  # se pueden ordenar con el encabezado
     resultado.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-    resultado.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    resultado.setFocusPolicy(Qt.FocusPolicy.TabFocus)  # se recorre con Tab y flechas, sin robar el foco al clic
     return resultado
 
 

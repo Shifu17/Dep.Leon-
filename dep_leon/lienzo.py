@@ -1,5 +1,6 @@
 """Dibuja los reportes. El mismo código produce el PDF, la imagen y la vista previa."""
 
+from functools import cache
 from pathlib import Path
 
 from PySide6.QtCore import QRectF, QSizeF, Qt
@@ -14,18 +15,19 @@ from PySide6.QtGui import (
     QPen,
 )
 
-from . import reportes
+from . import colores, reportes
 from .paths import asset
 
-OSCURO = QColor("#10291D")
-DORADO = QColor("#C9A24B")
-VERDE = QColor("#1E7F4C")
-TEXTO = QColor("#1E2B25")
-SUAVE = QColor("#52635A")
-ENCABEZADO = QColor("#E4EDE8")
-ALTERNA = QColor("#F1F6F3")
-BORDE = QColor("#CBD8D0")
-BLANCO = QColor("#FFFFFF")
+OSCURO = QColor(colores.BARRA)
+DORADO = QColor(colores.DORADO)
+VERDE = QColor(colores.VERDE)
+TEXTO = QColor(colores.TEXTO)
+SUAVE = QColor(colores.TEXTO_SUAVE)
+ENCABEZADO = QColor(colores.ENCABEZADO_TABLA)
+ALTERNA = QColor(colores.FILA_ALTERNA)
+BORDE = QColor(colores.BORDE)
+BLANCO = QColor(colores.BLANCO)
+TEXTO_BARRA = QColor(colores.TEXTO_BARRA)
 
 ANCHO = 720.0  # ancho útil en unidades lógicas, tanto en PDF como en imagen
 MARGEN_PDF = 48.0
@@ -33,6 +35,7 @@ MARGEN_IMAGEN = 24.0
 ESCALA_IMAGEN = 1.5  # da una imagen de buen tamaño para WhatsApp
 
 ALTO_ENCABEZADO = 96.0
+ANCHO_CLUB = 150.0  # bloque con el nombre del club, a la derecha del encabezado
 ALTO_TITULO_SECCION = 34.0
 ALTO_COLUMNAS = 28.0
 ALTO_FILA = 28.0
@@ -57,20 +60,38 @@ def _texto(p: QPainter, rect: QRectF, texto: str, alinear=Qt.AlignmentFlag.Align
     p.drawText(rect.adjusted(4, 0, -4, 0), alinear | Qt.AlignmentFlag.AlignVCenter, recortado)
 
 
+@cache
+def _escudo() -> QImage:
+    """El escudo se lee una sola vez, aunque se dibujen muchas hojas."""
+    return QImage(str(asset("escudo.png")))
+
+
 def _encabezado(p: QPainter, x: float, y: float, titulo: str, subtitulo: str) -> float:
     p.fillRect(QRectF(x, y, ANCHO, ALTO_ENCABEZADO), OSCURO)
     p.fillRect(QRectF(x, y + ALTO_ENCABEZADO, ANCHO, 4), DORADO)
-    logo = QImage(str(asset("logo.png")))
-    alto_logo = ALTO_ENCABEZADO - 10
-    ancho_logo = logo.width() * alto_logo / logo.height()
+    escudo = _escudo()
+    alto_escudo = ALTO_ENCABEZADO - 16
+    ancho_escudo = escudo.width() * alto_escudo / escudo.height()
     p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    p.drawImage(QRectF(x + 6, y + 5, ancho_logo, alto_logo), logo)
-    izquierda = x + ancho_logo + 22
+    p.drawImage(QRectF(x + 14, y + 8, ancho_escudo, alto_escudo), escudo)
+
+    # El nombre del club va como texto: dentro del escudo sería ilegible a este tamaño.
+    derecha = x + ANCHO - 16
+    p.setPen(TEXTO_BARRA)
+    p.setFont(_fuente(16, True))
+    club = QRectF(derecha - ANCHO_CLUB, y + 26, ANCHO_CLUB, 24)
+    p.drawText(club, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "Deportivo León")
+    p.setPen(DORADO)
+    p.setFont(_fuente(13))
+    p.drawText(club.translated(0, 22), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "Saltillo A.C.")
+
+    izquierda = x + 14 + ancho_escudo + 18
+    ancho_texto = derecha - ANCHO_CLUB - 16 - izquierda
     p.setPen(BLANCO)
     p.setFont(_fuente(24, True))
-    _texto(p, QRectF(izquierda, y + 16, x + ANCHO - izquierda - 10, 36), titulo, Qt.AlignmentFlag.AlignLeft)
+    _texto(p, QRectF(izquierda, y + 16, ancho_texto, 36), titulo, Qt.AlignmentFlag.AlignLeft)
     p.setFont(_fuente(15))
-    _texto(p, QRectF(izquierda, y + 52, x + ANCHO - izquierda - 10, 26), subtitulo, Qt.AlignmentFlag.AlignLeft)
+    _texto(p, QRectF(izquierda, y + 52, ancho_texto, 26), subtitulo, Qt.AlignmentFlag.AlignLeft)
     return y + ALTO_ENCABEZADO + 4 + SEPARACION
 
 

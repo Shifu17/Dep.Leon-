@@ -28,7 +28,7 @@ from .comun import boton, etiqueta, llenar, tabla
 def _solo_lectura(columnas: list[str], estirar: int) -> QTableWidget:
     resultado = tabla(columnas, estirar=estirar, ordenable=False)
     resultado.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-    resultado.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    resultado.setFocusPolicy(Qt.FocusPolicy.TabFocus)  # se recorre con Tab y flechas, sin robar el foco al clic
     return resultado
 
 

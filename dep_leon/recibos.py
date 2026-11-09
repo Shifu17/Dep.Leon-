@@ -10,14 +10,14 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from . import cobros
+from . import cobros, colores
 from .paths import asset
 
-OSCURO = HexColor("#10291D")
-DORADO = HexColor("#C9A24B")
-VERDE = HexColor("#1E7F4C")
-TEXTO = HexColor("#1E2B25")
-SUAVE = HexColor("#52635A")
+OSCURO = HexColor(colores.BARRA)
+DORADO = HexColor(colores.DORADO)
+VERDE = HexColor(colores.VERDE)
+TEXTO = HexColor(colores.TEXTO)
+SUAVE = HexColor(colores.TEXTO_SUAVE)
 LINEAS_MAXIMAS = 12
 
 
@@ -50,7 +50,7 @@ def generar(conn: sqlite3.Connection, folio: int, destino: Path | str) -> None:
     pdf.setFillColor(DORADO)
     pdf.rect(margen, y - alto_encabezado - 1 * mm, derecha - margen, 1 * mm, fill=1, stroke=0)
     pdf.drawImage(
-        ImageReader(str(asset("logo.png"))), margen + 2 * mm, y - alto_encabezado + 1.5 * mm,
+        ImageReader(str(asset("escudo.png"))), margen + 2 * mm, y - alto_encabezado + 1.5 * mm,
         28 * mm, alto_encabezado - 3 * mm, preserveAspectRatio=True, mask="auto",
     )
     pdf.setFillColor(white)

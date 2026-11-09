@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import cobros, credenciales, excel, rol
+from .. import cobros, colores, credenciales, excel, rol
 from ..db import clave_orden
 from ..jugadores import NUMERO_MAX, POSICIONES, borrar_foto, error_de_edad, guardar_foto
 from ..paths import fotos_dir
@@ -161,9 +161,8 @@ class DialogoJugador(QDialog):
         self.numero = QSpinBox(minimum=0, maximum=NUMERO_MAX)
         self.posicion = QComboBox()
         self.posicion.addItems([""] + POSICIONES)
-        self.vista_foto = QLabel("Sin foto", alignment=Qt.AlignmentFlag.AlignCenter)
+        self.vista_foto = QLabel("Sin foto", objectName="marcoFoto", alignment=Qt.AlignmentFlag.AlignCenter)
         self.vista_foto.setFixedSize(110, 130)
-        self.vista_foto.setStyleSheet("background: white; border: 1px solid #CBD8D0;")
         if jugador:
             self.fecha.setDate(QDate.fromString(jugador["fecha_nacimiento"], "yyyy-MM-dd"))
             self.numero.setValue(jugador["numero"])
@@ -249,7 +248,7 @@ class DialogoImportacion(QDialog):
         for r, f in enumerate(filas):
             if f.errores:
                 for c in range(vista.columnCount()):
-                    vista.item(r, c).setForeground(QColor("#B3140C"))
+                    vista.item(r, c).setForeground(QColor(colores.ROJO))
 
         caja = QDialogButtonBox()
         importar = caja.addButton(

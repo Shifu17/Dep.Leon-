@@ -10,6 +10,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
+from . import colores
 from .paths import asset
 
 ANCHO = 85.6 * mm
@@ -18,10 +19,10 @@ COLUMNAS = 2
 FILAS = 4
 SEPARACION = 4 * mm
 
-DORADO = HexColor("#C9A24B")
-VERDE = HexColor("#1E7F4C")
-FONDO = HexColor("#F4F7F5")
-OSCURO = HexColor("#10291D")
+DORADO = HexColor(colores.DORADO)
+VERDE = HexColor(colores.VERDE)
+FONDO = HexColor(colores.FONDO)
+OSCURO = HexColor(colores.BARRA)
 
 
 def generar(conn: sqlite3.Connection, equipo_id: int, destino: Path | str, fotos_dir: Path) -> int:
@@ -68,7 +69,7 @@ def _dibujar(pdf: canvas.Canvas, x: float, y: float, jugador, equipo, fotos_dir:
     pdf.setFillColor(OSCURO)
     pdf.rect(x + margen, tope - alto_encabezado, ANCHO - 2 * margen, alto_encabezado, fill=1, stroke=0)
     pdf.drawImage(
-        ImageReader(str(asset("logo.png"))),
+        ImageReader(str(asset("escudo.png"))),
         x + margen + 1 * mm, tope - alto_encabezado + 0.5 * mm,
         16 * mm, alto_encabezado - 1 * mm, preserveAspectRatio=True, mask="auto",
     )

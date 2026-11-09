@@ -2,8 +2,8 @@
 
 import re
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon, QKeySequence, QShortcut
+from PySide6.QtCore import QEvent, QSize, Qt
+from PySide6.QtGui import QGuiApplication, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -31,6 +31,38 @@ COLUMNAS_DERECHA = {
     "Pospuestos", "Por capturar",
 }
 COLUMNAS_CENTRO = {"Marcador", "Cancha", "Núm.", "Pos.", "#", "Lugar", "Foto", "Renglón"}
+
+
+class _Logo(QLabel):
+    """El escudo, redibujado a la escala del monitor donde está la ventana para que se vea nítido."""
+
+    def __init__(self, ancho: int, alto: int):
+        super().__init__(alignment=Qt.AlignmentFlag.AlignCenter)
+        self._caja = QSize(ancho, alto)
+        self._escala = 0.0
+        self.setAccessibleName("Escudo de Deportivo León, Saltillo A.C.")
+        pantalla = QGuiApplication.primaryScreen()
+        self._dibujar(pantalla.devicePixelRatio() if pantalla else 1.0)
+
+    def _dibujar(self, escala: float):
+        if escala == self._escala:
+            return
+        self._escala = escala
+        imagen = QPixmap(str(asset("logo.png"))).scaled(
+            self._caja * escala, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+        )
+        imagen.setDevicePixelRatio(escala)
+        self.setPixmap(imagen)
+
+    def event(self, evento: QEvent) -> bool:
+        if evento.type() in (QEvent.Type.Show, QEvent.Type.DevicePixelRatioChange):
+            self._dibujar(self.devicePixelRatioF())
+        return super().event(evento)
+
+
+def logo(ancho: int, alto: int) -> QLabel:
+    """El escudo completo, ajustado a la caja dada."""
+    return _Logo(ancho, alto)
 
 
 _NUMERO = re.compile(r"^[+\-]?\$?[\d,]+(\.\d+)?$")
