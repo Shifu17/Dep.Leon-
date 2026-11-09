@@ -20,7 +20,7 @@ sys.path.insert(0, str(RAIZ))
 from PySide6.QtGui import QFont, QFontDatabase  # noqa: E402
 from PySide6.QtWidgets import QApplication, QPushButton  # noqa: E402
 
-from dep_leon import acceso, cobros, db, liguilla, lienzo, reportes, resultados, rol, updater  # noqa: E402
+from dep_leon import acceso, asistencia, cobros, db, liguilla, lienzo, reportes, resultados, rol, updater  # noqa: E402
 from dep_leon.paths import db_path  # noqa: E402
 from dep_leon.ui.acceso import DialogoAcceso  # noqa: E402
 from dep_leon.ui.tema import ESTILO  # noqa: E402
@@ -73,6 +73,11 @@ def preparar(conn):
                 elegido = azar.choice(plantel[:3])
                 goles[elegido] = goles.get(elegido, 0) + 1
         resultados.guardar_resultado(conn, p["id"], goles_local, goles_visitante, goles)
+        vinieron = set(goles)
+        for equipo in (p["local_id"], p["visitante_id"]):
+            plantel = [j["id"] for j in conn.execute("SELECT id FROM jugadores WHERE equipo_id = ?", (equipo,))]
+            vinieron |= set(azar.sample(plantel, azar.randint(3, len(plantel))))
+        asistencia.guardar(conn, p["id"], vinieron)
 
     aguilas = conn.execute(
         "SELECT id FROM equipos WHERE nombre = 'Águilas' AND categoria_id = ?", (ids[0],)
@@ -141,6 +146,25 @@ def main():
         tabla.selectRow(next(f for f in range(tabla.rowCount()) if tabla.item(f, 0).text() == "Águilas"))
 
     capturar("Cobros", "cobros.png", elegir_equipo)
+
+    def equipo_con_lista():
+        ventana.equipos.categoria.setCurrentText("2015-2016")
+        app.processEvents()
+        tabla = ventana.equipos.tabla_equipos
+        tabla.selectRow(next(f for f in range(tabla.rowCount()) if tabla.item(f, 0).text() == "Águilas"))
+
+    capturar("Equipos y jugadores", "equipos.png", equipo_con_lista)
+    from dep_leon.ui.pagina_equipos import DialogoListaEquipo  # noqa: E402
+
+    aguilas_infantil = conn.execute(
+        "SELECT id FROM equipos WHERE nombre = 'Águilas' AND categoria_id = ?", (categorias[0],)
+    ).fetchone()["id"]
+    lista = DialogoListaEquipo(ventana, conn, aguilas_infantil, "Águilas")
+    lista.resize(900, 420)
+    lista.show()
+    app.processEvents()
+    lista.grab().save(str(DESTINO / "pase_de_lista.png"))
+    lista.close()
     primera_fecha = reportes.fechas_de_rol(conn, torneo)[-2]
     lienzo.guardar_imagen(reportes.hoja_rol(conn, torneo, None, primera_fecha), DESTINO / "reporte_rol.png")
     conn.close()

@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import lienzo, reportes
-from .comun import boton, error, etiqueta, info
+from .comun import ayuda_pagina, boton, error, etiqueta, info
 from .filtros import FiltrosLiga
 
 ROL = "Rol de juegos"
@@ -75,6 +75,9 @@ class PaginaReportes(QWidget):
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
         raiz.addWidget(QLabel("Reportes", objectName="titulo"))
+        raiz.addWidget(ayuda_pagina(
+            "Elige el reporte y guárdalo en PDF para imprimir, o como imagen para mandarlo por WhatsApp."
+        ))
         raiz.addWidget(self.filtros)
         raiz.addLayout(fila)
         raiz.addWidget(self.aviso)

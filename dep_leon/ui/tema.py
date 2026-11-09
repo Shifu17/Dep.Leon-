@@ -56,7 +56,7 @@ def _t(pixeles: int) -> str:
 
 
 ESTILO = f"""
-QWidget {{ font-size: {_t(13)}; }}
+QWidget {{ font-size: {_t(14)}; }}
 QMainWindow, QWidget#contenido {{ background: {FONDO}; }}
 QDialog, QMessageBox {{ background: {FONDO}; }}
 QWidget#panelLogo {{ background: {BARRA}; }}
@@ -64,8 +64,9 @@ QWidget#panelFormulario {{ background: {BLANCO}; }}
 QWidget#barra {{ background: {BARRA}; }}
 QLabel {{ color: {TEXTO}; }}
 QCheckBox, QRadioButton {{
-    color: {TEXTO}; border: 1px solid transparent; border-radius: 3px; padding: 1px 3px;
+    color: {TEXTO}; border: 1px solid transparent; border-radius: 3px; padding: 3px 4px; spacing: 8px;
 }}
+QCheckBox::indicator {{ width: 18px; height: 18px; }}
 QCheckBox:focus, QRadioButton:focus {{ border-color: {VERDE_ACTIVO}; }}
 
 QLabel#titulo {{
@@ -87,7 +88,7 @@ QLabel#vacio {{ color: {TEXTO_SUAVE}; background: transparent; }}
 QLabel#errorCampo {{ color: {ROJO}; }}
 QLineEdit[invalido="true"], QComboBox[invalido="true"], QSpinBox[invalido="true"],
 QDoubleSpinBox[invalido="true"], QDateEdit[invalido="true"], QTimeEdit[invalido="true"] {{
-    border: 2px solid {ROJO}; padding: 4px;
+    border: 2px solid {ROJO}; padding: 5px;
 }}
 QPushButton#mas {{ padding-right: 26px; }}
 QPushButton#mas::menu-indicator {{
@@ -126,6 +127,7 @@ QLabel#campeon {{
 }}
 QLabel#seccion {{ font-size: {_t(14)}; font-weight: 600; color: {TEXTO}; }}
 QLabel#ayuda {{ color: {TEXTO_SUAVE}; }}
+QLabel#ayudaPagina {{ color: {TEXTO_SUAVE}; padding: 2px 2px 4px 2px; }}
 QLabel#aviso {{ color: {ROJO}; font-weight: 600; }}
 QLabel#codigo {{
     background: {VERDE_SUAVE}; color: {TEXTO}; font-size: {_t(22)}; font-weight: 600;
@@ -134,7 +136,7 @@ QLabel#codigo {{
 
 QPushButton#nav {{
     background: transparent; color: {TEXTO_BARRA}; border: none; border-left: 4px solid transparent;
-    text-align: left; padding: 11px 14px; font-size: {_t(14)}; border-radius: 0;
+    text-align: left; padding: 11px 14px; font-size: {_t(15)}; border-radius: 0;
 }}
 QPushButton#nav:hover {{ background: {BARRA_HOVER}; }}
 QPushButton#nav:checked {{
@@ -148,20 +150,20 @@ QPushButton#nav:checked:focus {{ background: {VERDE}; border: 2px solid white; }
 
 QPushButton {{
     background: {VERDE}; color: white; border: 1px solid {VERDE}; border-radius: 6px;
-    padding: 7px 14px; font-weight: 600;
+    padding: 9px 14px; font-weight: 600;
 }}
 QPushButton:hover {{ background: {VERDE_ACTIVO}; border-color: {VERDE_ACTIVO}; }}
 QPushButton:pressed {{ background: {BARRA}; border-color: {BARRA}; }}
-QPushButton:focus {{ border: 2px solid {BARRA}; padding: 6px 13px; }}
+QPushButton:focus {{ border: 2px solid {BARRA}; padding: 8px 13px; }}
 QPushButton:disabled {{ background: {DESACTIVADO}; border-color: {DESACTIVADO}; color: {TEXTO_DESACTIVADO}; }}
 QPushButton#secundario, QPushButton#mas {{ background: {BLANCO}; color: {VERDE_ACTIVO}; border: 1px solid {BORDE_CONTROL}; }}
 QPushButton#secundario:hover, QPushButton#mas:hover {{ background: {VERDE_SUAVE}; border-color: {VERDE_ACTIVO}; }}
 QPushButton#secundario:pressed, QPushButton#mas:pressed {{ background: {VERDE_SUAVE}; }}
-QPushButton#secundario:focus, QPushButton#mas:focus {{ border: 2px solid {BARRA}; padding: 6px 13px; }}
+QPushButton#secundario:focus, QPushButton#mas:focus {{ border: 2px solid {BARRA}; padding: 8px 13px; }}
 QPushButton#peligro {{ background: {BLANCO}; color: {ROJO}; border: 1px solid {BORDE_PELIGRO}; }}
 QPushButton#peligro:hover {{ background: {ROJO_SUAVE}; border-color: {ROJO}; }}
 QPushButton#peligro:pressed {{ background: {ROJO_SUAVE}; }}
-QPushButton#peligro:focus {{ border: 2px solid {ROJO}; padding: 6px 13px; }}
+QPushButton#peligro:focus {{ border: 2px solid {ROJO}; padding: 8px 13px; }}
 
 QTableWidget {{
     background: {BLANCO}; alternate-background-color: {FILA_ALTERNA}; color: {TEXTO};
@@ -169,21 +171,21 @@ QTableWidget {{
     selection-background-color: {VERDE_SUAVE}; selection-color: {TEXTO};
 }}
 QTableWidget:focus {{ border: 2px solid {VERDE}; }}
-QTableWidget::item {{ padding: 0 3px; }}
+QTableWidget::item {{ padding: 0 4px; }}
 QTableWidget::item:selected {{
     background: {VERDE_SUAVE}; color: {TEXTO};
     border-top: 1px solid {VERDE}; border-bottom: 1px solid {VERDE};
 }}
 QHeaderView::section {{
-    background: {ENCABEZADO_TABLA}; color: {TEXTO}; font-weight: 600; padding: 6px;
+    background: {ENCABEZADO_TABLA}; color: {TEXTO}; font-weight: 600; padding: 7px 6px;
     border: none; border-right: 1px solid {BORDE}; border-bottom: 1px solid {BORDE};
 }}
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit {{
     background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE_CONTROL};
-    border-radius: 5px; padding: 5px;
+    border-radius: 5px; padding: 6px;
 }}
 QLineEdit:focus, QComboBox:focus, QDoubleSpinBox:focus, QSpinBox:focus, QDateEdit:focus, QTimeEdit:focus {{
-    border: 2px solid {VERDE}; padding: 4px;
+    border: 2px solid {VERDE}; padding: 5px;
 }}
 QDoubleSpinBox:disabled, QSpinBox:disabled, QTimeEdit:disabled {{ background: {CAMPO_DESACTIVADO}; color: {TEXTO_CAMPO_DESACTIVADO}; }}
 QComboBox::drop-down, QDateEdit::drop-down {{ border: none; width: 24px; }}

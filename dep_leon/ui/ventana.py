@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QMessageBox,
     QProgressDialog,

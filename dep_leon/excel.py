@@ -172,6 +172,7 @@ class Fila:
     numero: int | None = None
     posicion: str = ""
     foto: Path | None = None
+    curp: str = ""
     categoria_id: int | None = None
     jugador_id: int | None = None
     errores: list[str] = field(default_factory=list)
@@ -267,11 +268,19 @@ def analizar(conn: sqlite3.Connection, ruta: Path | str, torneo_id: int) -> list
     finally:
         libro.close()
 
+    return _validar(crudos, _categorias_de_torneo(conn, torneo_id), _existentes(conn, torneo_id), ruta.parent)
+
+
+def _categorias_de_torneo(conn: sqlite3.Connection, torneo_id: int) -> dict[str, sqlite3.Row]:
     torneo = conn.execute("SELECT liga_id FROM torneos WHERE id = ?", (torneo_id,)).fetchone()
-    categorias = {
+    return {
         _clave(c["nombre"]): c
         for c in conn.execute("SELECT * FROM categorias WHERE liga_id = ?", (torneo["liga_id"],))
     }
+
+
+def _existentes(conn: sqlite3.Connection, torneo_id: int) -> dict[tuple, dict]:
+    """Jugadores ya registrados en el torneo, por equipo, para no duplicarlos al importar."""
     existentes: dict[tuple, dict] = {}
     for j in conn.execute(
         """SELECT j.id, j.nombre, j.fecha_nacimiento, j.numero, e.categoria_id, e.nombre AS equipo
@@ -281,12 +290,12 @@ def analizar(conn: sqlite3.Connection, ruta: Path | str, torneo_id: int) -> list
         equipo = (j["categoria_id"], _clave(j["equipo"]))
         grupo = existentes.setdefault(equipo, {"personas": {}, "numeros": {}})
         grupo["personas"][(_clave(j["nombre"]), j["fecha_nacimiento"])] = j["id"]
-        grupo["numeros"][j["numero"]] = j["id"]
+        if j["numero"] is not None:
+            grupo["numeros"][j["numero"]] = j["id"]
+    return existentes
 
-    return _validar(crudos, categorias, existentes, ruta.parent)
 
-
-def _validar(crudos, categorias, existentes, carpeta: Path) -> list[Fila]:
+def _validar(crudos, categorias, existentes, carpeta: Path, numero_obligatorio: bool = True) -> list[Fila]:
     filas = []
     numeros_archivo: dict[tuple, int] = {}
     personas_archivo: dict[tuple, int] = {}
@@ -297,7 +306,8 @@ def _validar(crudos, categorias, existentes, carpeta: Path) -> list[Fila]:
             categoria=_texto(v["categoria"]),
             equipo=_texto(v["equipo"]),
             nombre=_texto(v["nombre"]),
-            posicion=_texto(v["posicion"]),
+            posicion=_texto(v.get("posicion")),
+            curp=_texto(v.get("curp")).upper().replace(" ", ""),
         )
         filas.append(fila)
 
@@ -321,7 +331,9 @@ def _validar(crudos, categorias, existentes, carpeta: Path) -> list[Fila]:
                 fila.errores.append(motivo)
 
         fila.numero = _leer_numero(v["numero"])
-        if fila.numero is None or not 0 <= fila.numero <= NUMERO_MAX:
+        if fila.numero is None and not numero_obligatorio and not _texto(v["numero"]):
+            pass  # la hoja de registro permite jugadores sin número todavía
+        elif fila.numero is None or not 0 <= fila.numero <= NUMERO_MAX:
             fila.errores.append(f"Número de playera no válido; debe ser de 0 a {NUMERO_MAX}.")
             fila.numero = None
 
@@ -332,7 +344,10 @@ def _validar(crudos, categorias, existentes, carpeta: Path) -> list[Fila]:
             else:
                 fila.posicion = posicion
 
-        nombre_foto = _texto(v["foto"])
+        if fila.curp and (len(fila.curp) != 18 or not fila.curp.isalnum()):
+            fila.avisos.append(f"La CURP «{fila.curp}» no tiene 18 letras y números; revísala.")
+
+        nombre_foto = _texto(v.get("foto"))
         if nombre_foto:
             fila.foto = _buscar_foto(nombre_foto, carpeta)
             if fila.foto is None:
@@ -367,53 +382,70 @@ def importar(
 
     Devuelve (jugadores nuevos, jugadores actualizados, equipos creados).
     """
-    nuevos = actualizados = equipos_creados = 0
     fotos_copiadas: list[Path] = []
-    equipos = {
-        (e["categoria_id"], _clave(e["nombre"])): e["id"]
-        for e in conn.execute("SELECT * FROM equipos WHERE torneo_id = ?", (torneo_id,))
-    }
-
     try:
         with conn:
-            for fila in filas:
-                if not fila.valida:
-                    continue
-                clave = (fila.categoria_id, _clave(fila.equipo))
-                equipo_id = equipos.get(clave)
-                if equipo_id is None:
-                    equipo_id = conn.execute(
-                        "INSERT INTO equipos (torneo_id, categoria_id, nombre) VALUES (?, ?, ?)",
-                        (torneo_id, fila.categoria_id, fila.equipo),
-                    ).lastrowid
-                    equipos[clave] = equipo_id
-                    equipos_creados += 1
-
-                foto = ""
-                if fila.foto is not None:
-                    try:
-                        foto = guardar_foto(fila.foto, fotos_dir)
-                        fotos_copiadas.append(fotos_dir / foto)
-                    except ValueError as exc:
-                        fila.avisos.append(f"{exc} Se registró sin ella.")
-
-                if fila.jugador_id is None:
-                    conn.execute(
-                        """INSERT INTO jugadores
-                           (equipo_id, nombre, fecha_nacimiento, numero, posicion, foto)
-                           VALUES (?, ?, ?, ?, ?, ?)""",
-                        (equipo_id, fila.nombre, fila.fecha.isoformat(), fila.numero, fila.posicion, foto),
-                    )
-                    nuevos += 1
-                else:
-                    conn.execute(
-                        """UPDATE jugadores SET numero = ?, posicion = ?,
-                           foto = CASE WHEN ? <> '' THEN ? ELSE foto END WHERE id = ?""",
-                        (fila.numero, fila.posicion, foto, foto, fila.jugador_id),
-                    )
-                    actualizados += 1
+            return _registrar(conn, filas, torneo_id, fotos_dir, fotos_copiadas)
     except Exception:
         for ruta in fotos_copiadas:
             ruta.unlink(missing_ok=True)
         raise
+
+
+def _registrar(
+    conn: sqlite3.Connection,
+    filas: list[Fila],
+    torneo_id: int,
+    fotos_dir: Path,
+    fotos_copiadas: list[Path],
+    responsable: str = "",
+) -> tuple[int, int, int]:
+    """Guarda las filas válidas; quien llama abre y cierra la transacción."""
+    nuevos = actualizados = equipos_creados = 0
+    equipos = {
+        (e["categoria_id"], _clave(e["nombre"])): e["id"]
+        for e in conn.execute("SELECT * FROM equipos WHERE torneo_id = ?", (torneo_id,))
+    }
+    for fila in filas:
+        if not fila.valida:
+            continue
+        clave = (fila.categoria_id, _clave(fila.equipo))
+        equipo_id = equipos.get(clave)
+        if equipo_id is None:
+            equipo_id = conn.execute(
+                "INSERT INTO equipos (torneo_id, categoria_id, nombre, responsable) VALUES (?, ?, ?, ?)",
+                (torneo_id, fila.categoria_id, fila.equipo, responsable),
+            ).lastrowid
+            equipos[clave] = equipo_id
+            equipos_creados += 1
+        elif responsable:
+            conn.execute(
+                "UPDATE equipos SET responsable = ? WHERE id = ? AND responsable = ''", (responsable, equipo_id)
+            )
+
+        foto = ""
+        if fila.foto is not None:
+            try:
+                foto = guardar_foto(fila.foto, fotos_dir)
+                fotos_copiadas.append(fotos_dir / foto)
+            except ValueError as exc:
+                fila.avisos.append(f"{exc} Se registró sin ella.")
+
+        if fila.jugador_id is None:
+            conn.execute(
+                """INSERT INTO jugadores
+                   (equipo_id, nombre, fecha_nacimiento, numero, posicion, foto, curp)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (equipo_id, fila.nombre, fila.fecha.isoformat(), fila.numero, fila.posicion, foto, fila.curp),
+            )
+            nuevos += 1
+        else:
+            # Un dato vacío en el archivo no borra lo que ya se tenía registrado.
+            conn.execute(
+                """UPDATE jugadores SET numero = COALESCE(?, numero), posicion = ?,
+                   foto = CASE WHEN ? <> '' THEN ? ELSE foto END,
+                   curp = CASE WHEN ? <> '' THEN ? ELSE curp END WHERE id = ?""",
+                (fila.numero, fila.posicion, foto, foto, fila.curp, fila.curp, fila.jugador_id),
+            )
+            actualizados += 1
     return nuevos, actualizados, equipos_creados

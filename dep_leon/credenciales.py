@@ -34,7 +34,7 @@ def generar(conn: sqlite3.Connection, equipo_id: int, destino: Path | str, fotos
         (equipo_id,),
     ).fetchone()
     jugadores = conn.execute(
-        "SELECT * FROM jugadores WHERE equipo_id = ? ORDER BY numero", (equipo_id,)
+        "SELECT * FROM jugadores WHERE equipo_id = ? ORDER BY numero IS NULL, numero, nombre COLLATE ES", (equipo_id,)
     ).fetchall()
 
     pdf = canvas.Canvas(str(destino), pagesize=letter)
@@ -115,16 +115,16 @@ def _dibujar(pdf: canvas.Canvas, x: float, y: float, jugador, equipo, fotos_dir:
     linea -= 5.5 * mm
     pdf.setFillColor(black)
     nacimiento = date.fromisoformat(jugador["fecha_nacimiento"]).strftime("%d/%m/%Y")
-    for titulo, valor in (
-        ("Equipo", equipo["nombre"]),
-        ("Categoría", equipo["categoria"]),
-        ("Nacimiento", nacimiento),
-        ("Número", str(jugador["numero"])),
-    ):
+    datos = [("Equipo", equipo["nombre"]), ("Categoría", equipo["categoria"]), ("Nacimiento", nacimiento)]
+    if jugador["numero"] is not None:
+        datos.append(("Número", str(jugador["numero"])))
+    if jugador["curp"]:
+        datos.append(("CURP", jugador["curp"]))
+    for titulo, valor in datos:
         pdf.setFont("Helvetica", 8)
         contenido = _ajustar(pdf, f"{titulo}: {valor}", "Helvetica", 8, texto_ancho)
         pdf.drawString(texto_x, linea, contenido)
-        linea -= 4.5 * mm
+        linea -= (4.5 if len(datos) <= 4 else 4.1) * mm  # con CURP y número caben cinco renglones
 
 
 def _ajustar(pdf: canvas.Canvas, texto: str, fuente: str, tamano: float, ancho: float) -> str:

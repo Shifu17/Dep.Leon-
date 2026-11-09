@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from .. import cobros, recibos
 from .comun import (
+    ayuda_pagina,
     al_activar,
     fila_con_error,
     poner_vacio,
@@ -177,7 +178,7 @@ class PaginaCobros(QWidget):
         self.solo_adeudo.toggled.connect(self.refrescar)
         self.equipos = tabla(["Equipo", "Categoría", "Cargos", "Pagado", "Saldo"], estirar=0)
         self.equipos.itemSelectionChanged.connect(self.refrescar_detalle)
-        self.busqueda = campo_busqueda(self.equipos, "Buscar equipo", ancho=150)
+        self.busqueda = campo_busqueda(self.equipos, "Buscar equipo", ancho=128)
         fila_filtros.insertWidget(1, self.busqueda)
         al_activar(self.equipos, self.registrar_pago)
         encabezado_equipos = QHBoxLayout()
@@ -220,6 +221,10 @@ class PaginaCobros(QWidget):
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
         raiz.addWidget(QLabel("Cobros", objectName="titulo"))
+        raiz.addWidget(ayuda_pagina(
+            "Lo que debe cada equipo. Toca un equipo y pulsa «Registrar pago» cuando te paguen; "
+            "el recibo sale con «Recibo PDF»."
+        ))
         raiz.addLayout(fila_filtros)
         raiz.addLayout(tarjetas)
         raiz.addLayout(columnas, 1)

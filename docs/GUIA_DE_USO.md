@@ -51,29 +51,59 @@ Entra a **Ligas y categorías** y selecciona una liga:
 
 Entra a **Equipos y jugadores** y elige liga y torneo. Hay dos formas de registrar jugadores.
 
-### Desde Excel (recomendado para muchos jugadores)
+### Desde las hojas de registro de los clubes (recomendado)
 
-1. Pulsa **Excel** y elige **Descargar plantilla**. La hoja **Instrucciones** explica cómo llenarla.
-2. Captura un jugador por renglón en la hoja **Jugadores**.
-3. Si hay fotos, ponlas en la misma carpeta que el Excel o en una subcarpeta `fotos`, y escribe el nombre
-   del archivo en la columna **Foto**.
-4. Guarda, cierra el archivo, pulsa **Excel** y elige **Importar jugadores**.
-5. Revisa la vista previa: los renglones con error salen en rojo y no se registran. Corrígelos en Excel y
-   vuelve a importar; los jugadores ya registrados se actualizan, no se duplican.
+Es el Excel que entrega cada club: **NOMBRE DEL CLUB**, **CATEGORÍA** y **RAMA** arriba; abajo la lista con
+**NO. PLAYERA**, **NOMBRE COMPLETO**, **FECHA DE NACIMIENTO**, **CURP** y las columnas J1, J2…; al final
+el entrenador.
 
-Los equipos que no existan se crean solos. El programa revisa que la fecha de nacimiento corresponda a
-la categoría y que no se repita el número de playera en un equipo.
+1. Pulsa **Importar Excel** y elige uno o **varios** archivos a la vez (mantén Ctrl para elegir varios).
+   Cada hoja de registro es un equipo, de la categoría que sea.
+2. Revisa la vista previa. Cada equipo aparece con su categoría en el programa:
+   - Si la encuentra, ya viene elegida (por nombre o por año de nacimiento, como «2014» en «2013-2014»).
+   - Si no existe, propone **Crear nueva** y la crea al importar, sin límite de edad.
+   - Puedes cambiarla en la lista; los jugadores se revisan otra vez al momento.
+3. Toca un equipo para ver sus jugadores. Los que tienen error salen en rojo y no se registran.
+4. Pulsa **Importar**.
+
+El equipo se crea solo y el entrenador queda como responsable. El número de playera y la CURP son
+opcionales: un jugador sin número aparece como «Sin número». Si vuelves a importar el mismo archivo, los
+jugadores se actualizan, no se duplican, y un dato vacío no borra lo que ya tenías.
+
+### Desde la plantilla del programa
+
+En **Más opciones**, elige **Descargar plantilla de Excel vacía**; la hoja **Instrucciones** explica cómo
+llenarla. Si hay fotos, ponlas en la misma carpeta que el Excel o en una subcarpeta `fotos` y escribe el
+nombre del archivo en la columna **Foto**. Después pulsa **Importar Excel**.
+
+En los dos casos, el programa revisa que la fecha de nacimiento corresponda a la categoría y que no se
+repita el número de playera en un equipo.
 
 ### A mano
 
 Agrega el equipo y, con el equipo seleccionado, agrega cada jugador.
 
+### Pase de lista
+
+Cada jugador tiene la columna **Asistencias** (por ejemplo, «3 de 4»: vino a 3 de los 4 partidos en que se
+pasó lista). Hay tres formas de pasar lista:
+
+- **Por partido, en Resultados:** selecciona el partido y pulsa **Pase de lista**. Sirve para anotar quién
+  llegó antes de que termine el partido.
+- **Al capturar el resultado:** junto a los goles de cada jugador está la casilla **¿Quién vino?**. Quien
+  anota gol queda marcado solo.
+- **Por equipo, en Equipos y jugadores:** con el equipo seleccionado, pulsa **Pase de lista**. Verás una
+  cuadrícula como la de la hoja de registro: un renglón por jugador y una columna por partido (J1, J2…).
+  Haz clic en la celda para marcar «Sí» y otro clic para quitarlo.
+
 ### Otras acciones del equipo
 
-En **Más**, con el equipo seleccionado:
+En **Más opciones**, con el equipo seleccionado:
 
-- **Disponibilidad:** indica qué días y horas puede jugar. Si no marcas nada, puede jugar siempre.
-- **Credenciales PDF:** genera las credenciales del equipo, 8 por hoja.
+- **Días y horas en que puede jugar:** si no marcas nada, puede jugar siempre.
+- **Credenciales en PDF:** genera las credenciales del equipo, 8 por hoja, con número y CURP si los tiene.
+- **Hoja de registro en Excel (con pase de lista):** guarda el equipo con el mismo formato de los clubes y
+  la asistencia de cada partido marcada, lista para imprimir.
 - **Eliminar equipo**.
 
 ## 4. Generar el rol de juegos
@@ -107,8 +137,8 @@ pospuesto o sin coincidencia de horarios aparece como **Sin fecha** hasta que le
 
 En **Resultados**, selecciona un partido y pulsa **Capturar resultado**, o haz doble clic en él.
 
-- **Marcador y goleadores:** los goleadores son opcionales. Puede haber goles sin jugador, como un
-  autogol, pero no más goles asignados que los del marcador.
+- **Marcador, quién vino y goleadores:** marca a los jugadores que se presentaron y, si quieres, quién
+  anotó. Puede haber goles sin jugador, como un autogol, pero no más goles asignados que los del marcador.
 - **Corregir:** vuelve a capturar el partido. **Borrar resultado** lo regresa a por jugar.
 
 Los partidos cuya fecha ya pasó sin resultado aparecen como **Atrasado**. Inicio avisa cuántos hay y te lleva

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QWi
 from .. import __version__, db
 from ..paths import fotos_dir
 from .acceso import DialogoCambiarContrasena
-from .comun import boton, confirmar, error, info
+from .comun import ayuda_pagina, boton, confirmar, error, info
 
 
 class PaginaConfig(QWidget):
@@ -25,6 +25,9 @@ class PaginaConfig(QWidget):
 
         raiz = QVBoxLayout(self)
         raiz.addWidget(QLabel("Configuración", objectName="titulo"))
+        raiz.addWidget(ayuda_pagina(
+            "Tu contraseña, los respaldos de tus datos y las actualizaciones del programa."
+        ))
 
         raiz.addWidget(QLabel("Cuenta", objectName="seccion"))
         fila = QHBoxLayout()

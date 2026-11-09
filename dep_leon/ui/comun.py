@@ -30,7 +30,10 @@ COLUMNAS_DERECHA = {
     "Saldo", "Monto", "Recibidos", "Promedio", "Categorías", "Equipos", "Por jugar", "Jugados",
     "Pospuestos", "Por capturar",
 }
-COLUMNAS_CENTRO = {"Marcador", "Cancha", "Núm.", "Pos.", "#", "Lugar", "Foto", "Renglón"}
+COLUMNAS_CENTRO = {
+    "Marcador", "Cancha", "Núm.", "Pos.", "#", "Lugar", "Foto", "Renglón", "Asistencias", "Total", "Listos",
+    "Con error",
+}
 
 
 class _Logo(QLabel):
@@ -147,6 +150,11 @@ def fila_con_error(forma, titulo: str, campo: QWidget) -> AvisoCampo:
     aviso = AvisoCampo(campo)
     forma.addRow(aviso)
     return aviso
+
+
+def ayuda_pagina(texto: str) -> QLabel:
+    """Una línea bajo el título que dice para qué sirve la pantalla y por dónde empezar."""
+    return QLabel(texto, objectName="ayudaPagina", wordWrap=True)
 
 
 def boton_mas(texto: str, acciones: list[tuple[str, object]]) -> QPushButton:

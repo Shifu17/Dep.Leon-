@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from .. import cobros, liguilla, rol
 from .comun import (
+    ayuda_pagina,
     AvisoCampo,
     al_activar,
     boton,
@@ -326,6 +327,9 @@ class PaginaRol(QWidget):
 
         raiz = QVBoxLayout(self)
         raiz.addWidget(self.titulo)
+        raiz.addWidget(ayuda_pagina(
+            "Aquí están todos los partidos. «Generar rol» los acomoda solo por fecha y cancha; con «Agregar partido» pones uno a mano."
+        ))
         raiz.addLayout(filtros)
         raiz.addLayout(acciones)
         raiz.addWidget(self.tabla, 1)

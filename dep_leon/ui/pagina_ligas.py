@@ -160,7 +160,7 @@ class PaginaLigas(QWidget):
         )
 
         titulo = QLabel("Ligas, categorías y torneos", objectName="titulo")
-        ayuda = QLabel("Selecciona una liga para ver y editar sus categorías y torneos.", objectName="ayuda")
+        ayuda = QLabel("Selecciona una liga para ver y editar sus categorías y torneos.", objectName="ayudaPagina")
         raiz = QVBoxLayout(self)
         raiz.addWidget(titulo)
         raiz.addWidget(ayuda)

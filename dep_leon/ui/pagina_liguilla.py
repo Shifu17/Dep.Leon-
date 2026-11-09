@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import liguilla, rol
-from .comun import boton, boton_mas, confirmar, error, etiqueta, info, llenar, tabla
+from .comun import ayuda_pagina, boton, boton_mas, confirmar, error, etiqueta, info, llenar, tabla
 from .filtros import FiltrosLiga
 from .pagina_resultados import borrar_resultado, capturar_partido, marcar_no_presentado
 from .pagina_rol import editar_partido
@@ -55,6 +55,9 @@ class PaginaLiguilla(QWidget):
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
         raiz.addWidget(QLabel("Liguilla", objectName="titulo"))
+        raiz.addWidget(ayuda_pagina(
+            "Al terminar las jornadas, elige cuántos equipos califican y pulsa «Crear liguilla». El ganador de cada partido avanza solo."
+        ))
         raiz.addWidget(self.filtros)
         raiz.addWidget(self.aviso)
         raiz.addWidget(self.crear_panel, 1)

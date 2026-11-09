@@ -104,16 +104,17 @@ def _botones_visibles(pagina):
     return [b for b in pagina.findChildren(QPushButton) if b.isVisible() and b.objectName() != "llave"]
 
 
-def test_equipos_agrupa_acciones_en_menus(ventana, app):
+def test_equipos_deja_a_la_vista_lo_frecuente(ventana, app):
     ventana._mostrar(ventana.equipos)
     app.processEvents()
     botones = _botones_visibles(ventana.equipos)
     textos = [b.text() for b in botones]
-    assert len(botones) <= 7, textos
+    assert len(botones) <= 8, textos
     assert sum(b.objectName() == "" for b in botones) <= 2  # solo los dos «Agregar» son principales
+    assert "Importar Excel" in textos and "Pase de lista" in textos
     menus = {b.text(): [a.text() for a in b.menu().actions()] for b in botones if b.menu()}
-    assert menus["Excel"] == ["Descargar plantilla", "Importar jugadores"]
-    assert "Eliminar equipo" in menus["Más"] and "Credenciales PDF" in menus["Más"]
+    assert "Eliminar equipo" in menus["Más opciones"] and "Credenciales en PDF" in menus["Más opciones"]
+    assert "Descargar plantilla de Excel vacía" in menus["Más opciones"]
 
 
 def test_menu_ejecuta_la_accion(app):

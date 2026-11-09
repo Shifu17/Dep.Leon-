@@ -28,7 +28,8 @@ tus datos se quedan en ella.
 | Área | Qué puedes hacer |
 |---|---|
 | **Ligas y categorías** | Administrar ligas por día, Fut 7 y Fut 11, categorías por año de nacimiento y torneos. |
-| **Equipos y jugadores** | Registrar jugadores a mano o desde una plantilla de Excel, con foto, y generar credenciales en PDF. |
+| **Equipos y jugadores** | Importar de una vez las hojas de registro de Excel de los clubes, de todas las categorías, o registrar a mano, con foto, CURP y credenciales en PDF. |
+| **Pase de lista** | Anotar quién vino a cada partido y ver la asistencia de cada jugador, como las columnas J1, J2… de la hoja de registro. |
 | **Rol de juegos** | Generar jornadas, repartir partidos según la disponibilidad de cada equipo y evitar empalmes de cancha. |
 | **Resultados** | Capturar marcadores y goleadores, posponer partidos o darlos por default indicando quién paga. |
 | **Estadísticas** | Consultar clasificación, tabla de goleadores y portería menos goleada, con puntos configurables. |
@@ -45,6 +46,10 @@ tus datos se quedan en ella.
 | Liguilla | Cobros |
 |---|---|
 | ![Llave de liguilla con semifinales y final](docs/img/liguilla.png) | ![Adeudos por equipo, cargos y pagos](docs/img/cobros.png) |
+
+| Equipos y jugadores | Pase de lista |
+|---|---|
+| ![Equipos con sus jugadores y la asistencia de cada uno](docs/img/equipos.png) | ![Cuadrícula de asistencia por partido, J1 a J5](docs/img/pase_de_lista.png) |
 
 **Imagen lista para WhatsApp:**
 

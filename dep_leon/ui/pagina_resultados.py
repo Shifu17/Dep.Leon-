@@ -3,26 +3,23 @@
 import sqlite3
 from datetime import date
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QDialog,
     QFormLayout,
-    QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QRadioButton,
-    QScrollArea,
     QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
-from .. import liguilla, resultados, rol
+from .. import asistencia, liguilla, resultados, rol
 from .comun import (
+    ayuda_pagina,
     AvisoCampo,
     al_activar,
     boton,
@@ -36,6 +33,7 @@ from .comun import (
     tabla,
 )
 from .filtros import FiltrosLiga
+from .lista import ColumnaEquipo, pasar_lista
 from .tema import ROJO
 
 GOLES_MAXIMOS = 99
@@ -48,7 +46,7 @@ class DialogoResultado(QDialog):
     def __init__(self, padre, conn: sqlite3.Connection, partido, local: str, visitante: str):
         super().__init__(padre)
         self.setWindowTitle("Capturar resultado")
-        self.resize(640, 520)
+        self.resize(900, 620)
         self.conn = conn
         self.partido = partido
 
@@ -65,15 +63,18 @@ class DialogoResultado(QDialog):
         self.marcador_visitante = QSpinBox(
             minimum=0, maximum=GOLES_MAXIMOS, value=previo["goles_visitante"] if previo else 0
         )
-        self.goles: dict[int, QSpinBox] = {}
+        presentes = asistencia.presentes(conn, partido["id"])
+        self.local = ColumnaEquipo(
+            conn, local, partido["local_id"], presentes, goles_previos, self.marcador_local
+        )
+        self.visitante = ColumnaEquipo(
+            conn, visitante, partido["visitante_id"], presentes, goles_previos, self.marcador_visitante
+        )
 
         columnas = QHBoxLayout()
-        columnas.addLayout(
-            self._columna(local, partido["local_id"], self.marcador_local, goles_previos)
-        )
-        columnas.addLayout(
-            self._columna(visitante, partido["visitante_id"], self.marcador_visitante, goles_previos)
-        )
+        columnas.addWidget(self.local, 1)
+        columnas.addSpacing(16)
+        columnas.addWidget(self.visitante, 1)
 
         raiz = QVBoxLayout(self)
         raiz.addLayout(columnas, 1)
@@ -100,8 +101,8 @@ class DialogoResultado(QDialog):
 
         raiz.addWidget(
             QLabel(
-                "Los goleadores son opcionales. Puedes dejar goles sin jugador (como un autogol), "
-                "pero no asignar más goles que los del marcador.",
+                "Marca quién vino y, si quieres, quién anotó. Puedes dejar goles sin jugador "
+                "(como un autogol), pero no asignar más goles que los del marcador.",
                 objectName="ayuda", wordWrap=True,
             )
         )
@@ -109,39 +110,13 @@ class DialogoResultado(QDialog):
         raiz.addWidget(self.aviso)
         raiz.addWidget(botones_dialogo(self, self._aceptar))
 
-    def _columna(self, nombre: str, equipo_id: int, marcador: QSpinBox, previos: dict[int, int]):
-        columna = QVBoxLayout()
-        columna.addWidget(QLabel(nombre, objectName="seccion", alignment=Qt.AlignmentFlag.AlignCenter))
-        marcador.setObjectName("marcador")
-        marcador.setAccessibleName(f"Goles de {nombre}")
-        marcador.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        columna.addWidget(marcador)
-        columna.addWidget(QLabel("Goleadores"))
-
-        contenido = QWidget(objectName="listaGoles")
-        rejilla = QGridLayout(contenido)
-        jugadores = self.conn.execute(
-            "SELECT * FROM jugadores WHERE equipo_id = ? ORDER BY numero", (equipo_id,)
-        ).fetchall()
-        for i, j in enumerate(jugadores):
-            control = QSpinBox(minimum=0, maximum=GOLES_MAXIMOS, value=previos.get(j["id"], 0))
-            self.goles[j["id"]] = control
-            control.setAccessibleName(f"Goles de {j['nombre']}, número {j['numero']}")
-            rejilla.addWidget(QLabel(f"{j['numero']}  {j['nombre']}"), i, 0)
-            rejilla.addWidget(control, i, 1)
-        rejilla.setRowStretch(len(jugadores), 1)
-        rejilla.setColumnStretch(0, 1)
-        if not jugadores:
-            rejilla.addWidget(QLabel("Sin jugadores registrados.", objectName="ayuda"), 0, 0)
-
-        area = QScrollArea(frameShape=QFrame.Shape.NoFrame)
-        area.setWidgetResizable(True)
-        area.setWidget(contenido)
-        columna.addWidget(area, 1)
-        return columna
+    @property
+    def goles(self) -> dict:
+        """Control de goles de cada jugador de los dos equipos."""
+        return {**self.local.goles, **self.visitante.goles}
 
     def goleadores(self) -> dict[int, int]:
-        return {j: c.value() for j, c in self.goles.items() if c.value()}
+        return {**self.local.goleadores(), **self.visitante.goleadores()}
 
     def _aceptar(self):
         try:
@@ -151,6 +126,11 @@ class DialogoResultado(QDialog):
                 (self.penales_local.value(), self.penales_visitante.value())
                 if self.pide_penales
                 else None,
+            )
+            # Quien anotó, vino, aunque no lo hayan marcado.
+            asistencia.guardar(
+                self.conn, self.partido["id"],
+                self.local.presentes() | self.visitante.presentes() | set(self.goleadores()),
             )
         except ValueError as exc:
             self.aviso.mostrar(str(exc))
@@ -274,6 +254,7 @@ class PaginaResultados(QWidget):
 
         acciones = QHBoxLayout()
         acciones.addWidget(boton("Capturar resultado", self.capturar))
+        acciones.addWidget(boton("Pase de lista", self.pase_de_lista, "secundario"))
         acciones.addWidget(boton("No se presentó", self.no_se_presento, "secundario"))
         acciones.addWidget(boton("Borrar resultado", self.borrar, "peligro"))
         acciones.addStretch(1)
@@ -293,6 +274,9 @@ class PaginaResultados(QWidget):
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
         raiz.addWidget(QLabel("Resultados", objectName="titulo"))
+        raiz.addWidget(ayuda_pagina(
+            "Toca un partido y pulsa «Capturar resultado» para anotar el marcador, los goles y quién vino. Con «Pase de lista» anotas la asistencia antes de que termine el partido."
+        ))
         raiz.addLayout(filtros)
         raiz.addLayout(acciones)
         raiz.addWidget(self.vacio)
@@ -354,6 +338,11 @@ class PaginaResultados(QWidget):
         partido = self._partido()
         if partido is not None and capturar_partido(self, self.conn, partido):
             self.refrescar_partidos()
+
+    def pase_de_lista(self):
+        partido = self._partido()
+        if partido is not None:
+            pasar_lista(self, self.conn, _partido_completo(self.conn, partido))
 
     def no_se_presento(self):
         partido = self._partido()

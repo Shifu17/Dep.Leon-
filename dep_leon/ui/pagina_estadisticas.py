@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import estadisticas, resultados
-from .comun import boton, botones_dialogo, error, llenar, poner_vacio, tabla
+from .comun import ayuda_pagina, boton, botones_dialogo, error, llenar, poner_vacio, tabla
 from .filtros import FiltrosLiga
 
 
@@ -96,6 +96,9 @@ class PaginaEstadisticas(QWidget):
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
         raiz.addWidget(QLabel("Estadísticas", objectName="titulo"))
+        raiz.addWidget(ayuda_pagina(
+            "Posiciones, goleadores y portería menos goleada. Se calculan solas con los resultados que captures."
+        ))
         raiz.addLayout(fila_filtros)
         raiz.addLayout(columnas, 1)
         raiz.addWidget(self.leyenda)

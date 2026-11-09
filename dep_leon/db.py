@@ -43,9 +43,10 @@ CREATE TABLE IF NOT EXISTS jugadores (
     equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
     nombre TEXT NOT NULL,
     fecha_nacimiento TEXT NOT NULL,
-    numero INTEGER NOT NULL,
+    numero INTEGER,
     posicion TEXT NOT NULL DEFAULT '',
     foto TEXT NOT NULL DEFAULT '',
+    curp TEXT NOT NULL DEFAULT '',
     UNIQUE (equipo_id, numero),
     UNIQUE (equipo_id, nombre, fecha_nacimiento)
 );
@@ -189,11 +190,58 @@ CREATE TABLE IF NOT EXISTS usuarios (
     contrasena TEXT NOT NULL,
     codigo TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS asistencias (
+    partido_id INTEGER NOT NULL REFERENCES partidos(id) ON DELETE CASCADE,
+    jugador_id INTEGER NOT NULL REFERENCES jugadores(id) ON DELETE CASCADE,
+    PRIMARY KEY (partido_id, jugador_id)
+);
 CREATE TABLE IF NOT EXISTS config_rol (
     torneo_id INTEGER PRIMARY KEY REFERENCES torneos(id) ON DELETE CASCADE,
     datos TEXT NOT NULL
 );
 """
+
+# Cómo se crea la tabla de jugadores hoy; la migración copia los datos de versiones anteriores a ella.
+TABLA_JUGADORES = """CREATE TABLE jugadores (
+    id INTEGER PRIMARY KEY,
+    equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+    nombre TEXT NOT NULL,
+    fecha_nacimiento TEXT NOT NULL,
+    numero INTEGER,
+    posicion TEXT NOT NULL DEFAULT '',
+    foto TEXT NOT NULL DEFAULT '',
+    curp TEXT NOT NULL DEFAULT '',
+    UNIQUE (equipo_id, numero),
+    UNIQUE (equipo_id, nombre, fecha_nacimiento)
+);"""
+
+
+def _migrar(conn: sqlite3.Connection) -> None:
+    """Pone al día una base de una versión anterior sin perder datos.
+
+    Hasta la versión 0.9.5 el número de playera era obligatorio y no se guardaba la CURP; las hojas
+    de registro de los equipos suelen traer jugadores sin número.
+    """
+    columnas = {c["name"]: c for c in conn.execute("PRAGMA table_info(jugadores)")}
+    if "curp" in columnas and not columnas["numero"]["notnull"]:
+        return
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        with conn:
+            conn.execute("BEGIN")  # todo o nada: el esquema también entra en la transacción
+            conn.execute(TABLA_JUGADORES.replace("jugadores (", "jugadores_nueva (", 1))
+            conn.execute(
+                """INSERT INTO jugadores_nueva (id, equipo_id, nombre, fecha_nacimiento, numero, posicion, foto)
+                   SELECT id, equipo_id, nombre, fecha_nacimiento, numero, posicion, foto FROM jugadores"""
+            )
+            conn.execute("DROP TABLE jugadores")
+            conn.execute("ALTER TABLE jugadores_nueva RENAME TO jugadores")
+            if conn.execute("PRAGMA foreign_key_check").fetchone():
+                raise sqlite3.IntegrityError("La migración de jugadores dejó referencias rotas.")
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
+
 
 LIGAS_INICIALES = [
     ("Femenil", "Fut 7", "Lunes"),
@@ -232,6 +280,7 @@ def conectar(ruta: Path | str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(ESQUEMA)
+    _migrar(conn)
     _cargar_datos_iniciales(conn)
     return conn
 
@@ -284,6 +333,7 @@ def restaurar(conn: sqlite3.Connection, origen: Path | str, fotos_dir: Path) -> 
                 fuente.backup(conn)
                 # Un respaldo de una versión anterior puede no traer las tablas nuevas.
                 conn.executescript(ESQUEMA)
+                _migrar(conn)
                 with conn:
                     conn.execute("DELETE FROM usuarios")
                     conn.executemany(

@@ -6,8 +6,9 @@ from datetime import date
 from pathlib import Path
 
 from PySide6.QtCore import QDate, Qt, QTime, Signal
-from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtGui import QColor, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDateEdit,
@@ -20,16 +21,18 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QSpinBox,
+    QTableWidgetItem,
     QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
 
-from .. import cobros, colores, credenciales, excel, rol
+from .. import asistencia, cobros, colores, credenciales, excel, registro, rol
 from ..db import clave_orden
 from ..jugadores import NUMERO_MAX, POSICIONES, borrar_foto, error_de_edad, guardar_foto
 from ..paths import fotos_dir
 from .comun import (
+    ayuda_pagina,
     AvisoCampo,
     al_activar,
     boton,
@@ -158,14 +161,17 @@ class DialogoJugador(QDialog):
         self.fecha.setMaximumDate(QDate.currentDate())
         anio = categoria["anio_min"] or date.today().year - 18
         self.fecha.setDate(QDate(anio, 1, 1))
-        self.numero = QSpinBox(minimum=0, maximum=NUMERO_MAX)
+        # -1 se muestra como «Sin número»: la hoja de registro de los clubes a veces no lo trae.
+        self.numero = QSpinBox(minimum=-1, maximum=NUMERO_MAX, value=-1, specialValueText="Sin número")
+        self.curp = QLineEdit(jugador["curp"] if jugador else "", maxLength=18)
+        self.curp.setPlaceholderText("18 letras y números (opcional)")
         self.posicion = QComboBox()
         self.posicion.addItems([""] + POSICIONES)
         self.vista_foto = QLabel("Sin foto", objectName="marcoFoto", alignment=Qt.AlignmentFlag.AlignCenter)
         self.vista_foto.setFixedSize(110, 130)
         if jugador:
             self.fecha.setDate(QDate.fromString(jugador["fecha_nacimiento"], "yyyy-MM-dd"))
-            self.numero.setValue(jugador["numero"])
+            self.numero.setValue(-1 if jugador["numero"] is None else jugador["numero"])
             self.posicion.setCurrentText(jugador["posicion"])
             if jugador["foto"]:
                 self._mostrar_foto(fotos_dir() / jugador["foto"])
@@ -174,6 +180,7 @@ class DialogoJugador(QDialog):
         self.error_nombre = fila_con_error(forma, "Nombre completo:", self.nombre)
         self.error_fecha = fila_con_error(forma, "Fecha de nacimiento:", self.fecha)
         forma.addRow("Número de playera:", self.numero)
+        self.error_curp = fila_con_error(forma, "CURP:", self.curp)
         forma.addRow("Posición:", self.posicion)
         forma.addRow("Foto:", self.vista_foto)
         forma.addRow("", boton("Elegir foto...", self._elegir_foto, "secundario"))
@@ -204,6 +211,12 @@ class DialogoJugador(QDialog):
     def fecha_nacimiento(self) -> date:
         return self.fecha.date().toPython()
 
+    def numero_playera(self) -> int | None:
+        return None if self.numero.value() < 0 else self.numero.value()
+
+    def curp_limpia(self) -> str:
+        return self.curp.text().strip().upper().replace(" ", "")
+
     def _aceptar(self):
         if not self.nombre.text().strip():
             self.error_nombre.mostrar("Escribe el nombre del jugador.")
@@ -213,6 +226,10 @@ class DialogoJugador(QDialog):
         )
         if motivo:
             self.error_fecha.mostrar(motivo)
+            return
+        curp = self.curp_limpia()
+        if curp and (len(curp) != 18 or not curp.isalnum()):
+            self.error_curp.mostrar("La CURP tiene 18 letras y números; revísala o déjala vacía.")
             return
         self.accept()
 
@@ -267,6 +284,224 @@ class DialogoImportacion(QDialog):
         raiz.addWidget(caja)
 
 
+class DialogoRegistros(QDialog):
+    """Vista previa de las hojas de registro: un renglón por equipo, con su categoría y sus jugadores."""
+
+    def __init__(self, padre, conn, registros: list[registro.Registro], torneo_id: int, categorias):
+        super().__init__(padre)
+        self.setWindowTitle("Revisa antes de importar")
+        self.resize(1040, 640)
+        self.conn = conn
+        self.registros = registros
+        self.torneo_id = torneo_id
+
+        self.resumen = QLabel(objectName="seccion")
+        self.equipos = tabla(["Archivo", "Equipo", "Categoría en el Excel", "Categoría en el programa", "Listos", "Con error"], estirar=1)
+        self.equipos.setSortingEnabled(False)
+        self.jugadores = tabla(["Renglón", "Núm.", "Jugador", "Nacimiento", "CURP", "Estado"], estirar=5)
+        self.jugadores.setSortingEnabled(False)
+
+        self.equipos.setRowCount(len(registros))
+        for r, reg in enumerate(registros):
+            for c, valor in enumerate([reg.archivo, reg.equipo, " ".join(x for x in (reg.categoria, reg.rama) if x)]):
+                self.equipos.setItem(r, c, QTableWidgetItem(valor))
+            combo = QComboBox()
+            for cat in categorias:
+                combo.addItem(cat["nombre"], cat["id"])
+            combo.addItem(f"Crear nueva: «{registro.nombre_sugerido(reg)}»", registro.CATEGORIA_NUEVA)
+            combo.setCurrentIndex(combo.findData(reg.categoria_id))
+            combo.setAccessibleName(f"Categoría para {reg.equipo}")
+            combo.currentIndexChanged.connect(lambda _=0, fila=r, cb=combo: self._cambiar_categoria(fila, cb))
+            self.equipos.setCellWidget(r, 3, combo)
+        self.equipos.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.equipos.itemSelectionChanged.connect(self._mostrar_jugadores)
+
+        caja = QDialogButtonBox()
+        self.importar = caja.addButton("Importar", QDialogButtonBox.ButtonRole.AcceptRole)
+        cancelar = caja.addButton("Cancelar", QDialogButtonBox.ButtonRole.RejectRole)
+        cancelar.setObjectName("secundario")
+        caja.accepted.connect(self.accept)
+        caja.rejected.connect(self.reject)
+
+        raiz = QVBoxLayout(self)
+        raiz.addWidget(self.resumen)
+        raiz.addWidget(
+            QLabel(
+                "Revisa que cada equipo quede en la categoría correcta; si no existe, se crea al importar. "
+                "Toca un equipo para ver sus jugadores. Los renglones con error no se registran: corrígelos "
+                "en Excel y vuelve a importar, sin miedo a duplicar.",
+                objectName="ayuda", wordWrap=True,
+            )
+        )
+        raiz.addWidget(self.equipos, 2)
+        raiz.addWidget(QLabel("Jugadores del equipo elegido", objectName="seccion"))
+        raiz.addWidget(self.jugadores, 3)
+        raiz.addWidget(caja)
+        self._actualizar()
+        self.equipos.selectRow(0)
+
+    def _cambiar_categoria(self, fila: int, combo: QComboBox):
+        reg = self.registros[fila]
+        reg.categoria_id = combo.currentData()
+        reg.nombre_categoria_nueva = registro.nombre_sugerido(reg)
+        registro.validar(self.conn, reg, self.torneo_id)
+        self._actualizar()
+        self.equipos.selectRow(fila)
+        self._mostrar_jugadores()
+
+    def _actualizar(self):
+        for r, reg in enumerate(self.registros):
+            con_error = len(reg.filas) - reg.validas if not reg.errores else len(reg.crudos)
+            for c, valor in ((4, reg.validas), (5, con_error)):
+                celda = QTableWidgetItem(str(valor))
+                celda.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if c == 5 and valor:
+                    celda.setForeground(QColor(colores.ROJO))
+                self.equipos.setItem(r, c, celda)
+        listos = sum(reg.validas for reg in self.registros)
+        equipos = sum(1 for reg in self.registros if reg.validas)
+        self.resumen.setText(
+            f"{_cuantos(len(self.registros), 'equipo encontrado', 'equipos encontrados')} · "
+            f"{_cuantos(listos, 'jugador listo', 'jugadores listos')} para registrar"
+        )
+        self.importar.setText(
+            f"Importar {_cuantos(listos, 'jugador', 'jugadores')} de {_cuantos(equipos, 'equipo', 'equipos')}"
+        )
+        self.importar.setEnabled(listos > 0)
+
+    def _mostrar_jugadores(self):
+        fila = self.equipos.currentRow()
+        if fila < 0:
+            return
+        reg = self.registros[fila]
+        renglones = []
+        for f in reg.filas:
+            if reg.errores:
+                estado = "Error: " + " ".join(reg.errores)
+            elif f.errores:
+                estado = "Error: " + " ".join(f.errores)
+            elif f.avisos:
+                estado = "Aviso: " + " ".join(f.avisos)
+            else:
+                estado = "Actualizar" if f.jugador_id else "Nuevo"
+            nacimiento = f.fecha.strftime("%d/%m/%Y") if f.fecha else "-"
+            renglones.append((f.renglon, [f.renglon, f.numero, f.nombre, nacimiento, f.curp, estado]))
+        llenar(self.jugadores, renglones)
+        for r, f in enumerate(reg.filas):
+            if f.errores or reg.errores:
+                for c in range(self.jugadores.columnCount()):
+                    self.jugadores.item(r, c).setForeground(QColor(colores.ROJO))
+
+
+class DialogoListaEquipo(QDialog):
+    """Pase de lista del equipo en todos sus partidos, como las columnas J1, J2... de la hoja de registro.
+
+    Basta un clic en la celda (o la barra espaciadora) para marcar o desmarcar: es más fácil de atinar
+    que una casilla pequeña.
+    """
+
+    ANCHO_PARTIDO = 64
+    MARCA = "Sí"  # texto, no un símbolo: se lee igual con cualquier fuente
+
+    def __init__(self, padre, conn, equipo_id: int, nombre: str):
+        super().__init__(padre)
+        self.setWindowTitle(f"Pase de lista: {nombre}")
+        self.resize(980, 600)
+        self.conn = conn
+        self.equipo_id = equipo_id
+        self.partidos = asistencia.partidos_de_equipo(conn, equipo_id)
+        asistio = asistencia.de_equipo(conn, equipo_id)
+        self.jugadores = conn.execute(
+            "SELECT * FROM jugadores WHERE equipo_id = ? ORDER BY numero IS NULL, numero, nombre COLLATE ES",
+            (equipo_id,),
+        ).fetchall()
+
+        self.rejilla = tabla(["Jugador", *[p.etiqueta for p in self.partidos], "Total"], estirar=0, ordenable=False)
+        self.rejilla.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.rejilla.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        cabecera = self.rejilla.horizontalHeader()
+        for c, p in enumerate(self.partidos, start=1):
+            self.rejilla.horizontalHeaderItem(c).setToolTip(p.descripcion)
+            cabecera.setSectionResizeMode(c, cabecera.ResizeMode.Fixed)
+            self.rejilla.setColumnWidth(c, max(self.ANCHO_PARTIDO, cabecera.sectionSizeHint(c)))
+        self.rejilla.setRowCount(len(self.jugadores))
+        for r, j in enumerate(self.jugadores):
+            nombre_jugador = f"{j['numero']}  {j['nombre']}" if j["numero"] is not None else j["nombre"]
+            celda = QTableWidgetItem(nombre_jugador)
+            celda.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            self.rejilla.setItem(r, 0, celda)
+            for c, p in enumerate(self.partidos, start=1):
+                casilla = QTableWidgetItem()
+                casilla.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                casilla.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                casilla.setToolTip(f"{j['nombre']}: {p.descripcion}")
+                self.rejilla.setItem(r, c, casilla)
+                self._poner(r, c, p.id in asistio.get(j["id"], set()))
+            total = QTableWidgetItem()
+            total.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            total.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.rejilla.setItem(r, len(self.partidos) + 1, total)
+            self._contar(r)
+        self.rejilla.cellClicked.connect(self.alternar)
+        if self.jugadores and self.partidos:
+            self.rejilla.setCurrentCell(0, 1)  # el teclado empieza en el primer partido, no en el nombre
+        espacio = QShortcut(QKeySequence(Qt.Key.Key_Space), self.rejilla)
+        espacio.setContext(Qt.ShortcutContext.WidgetShortcut)
+        espacio.activated.connect(lambda: self.alternar(self.rejilla.currentRow(), self.rejilla.currentColumn()))
+
+        raiz = QVBoxLayout(self)
+        raiz.addWidget(QLabel(nombre, objectName="seccion"))
+        raiz.addWidget(
+            QLabel(
+                "Haz clic en la celda del partido al que vino cada jugador; otro clic la desmarca. "
+                "Pasa el mouse por el encabezado para ver la fecha y el rival de cada partido.",
+                objectName="ayuda", wordWrap=True,
+            )
+        )
+        raiz.addWidget(self.rejilla, 1)
+        raiz.addWidget(botones_dialogo(self, self._aceptar, "Guardar lista"))
+
+    def marcado(self, fila: int, columna: int) -> bool:
+        return bool(self.rejilla.item(fila, columna).data(Qt.ItemDataRole.UserRole))
+
+    def _poner(self, fila: int, columna: int, valor: bool):
+        celda = self.rejilla.item(fila, columna)
+        celda.setData(Qt.ItemDataRole.UserRole, valor)
+        celda.setText(self.MARCA if valor else "")
+        celda.setBackground(QColor(colores.VERDE_SUAVE) if valor else QColor(0, 0, 0, 0))
+        celda.setForeground(QColor(colores.VERDE_ACTIVO))
+        celda.setFont(self._fuente_marca())
+        celda.setData(Qt.ItemDataRole.AccessibleTextRole, "vino" if valor else "no vino")
+
+    def _fuente_marca(self):
+        fuente = self.rejilla.font()
+        fuente.setBold(True)
+        return fuente
+
+    def alternar(self, fila: int, columna: int):
+        if fila < 0 or not 1 <= columna <= len(self.partidos):
+            return
+        self._poner(fila, columna, not self.marcado(fila, columna))
+        self._contar(fila)
+
+    def _contar(self, fila: int):
+        vino = sum(self.marcado(fila, c) for c in range(1, len(self.partidos) + 1))
+        self.rejilla.item(fila, len(self.partidos) + 1).setText(str(vino))
+
+    def _aceptar(self):
+        marcas = {p.id: set() for p in self.partidos}
+        for r, j in enumerate(self.jugadores):
+            for c, p in enumerate(self.partidos, start=1):
+                if self.marcado(r, c):
+                    marcas[p.id].add(j["id"])
+        try:
+            asistencia.guardar_de_equipo(self.conn, self.equipo_id, marcas)
+        except ValueError as exc:
+            error(self, str(exc))
+            return
+        self.accept()
+
+
 class PaginaEquipos(QWidget):
     datos_cambiados = Signal()
 
@@ -280,16 +515,13 @@ class PaginaEquipos(QWidget):
         self.filtros.cambiado.connect(self.refrescar_equipos)
 
         excel_fila = QHBoxLayout()
-        excel_fila.addWidget(
-            boton_mas(
-                "Excel",
-                [("Descargar plantilla", self.descargar_plantilla), ("Importar jugadores", self.importar_excel)],
-            )
-        )
+        excel_fila.addWidget(boton("Importar Excel", self.importar_excel, "secundario"))
         excel_fila.addStretch(1)
 
         self.tabla_equipos = tabla(["Equipo", "Categoría", "Jugadores", "Disponible"], estirar=0)
-        self.tabla_jugadores = tabla(["Núm.", "Jugador", "Nacimiento", "Posición", "Foto"], estirar=1)
+        self.tabla_jugadores = tabla(
+            ["Núm.", "Jugador", "Nacimiento", "Posición", "Asistencias", "Foto"], estirar=1
+        )
         self.tabla_equipos.itemSelectionChanged.connect(self.refrescar_jugadores)
         al_activar(self.tabla_equipos, self.editar_equipo)
         al_activar(self.tabla_jugadores, self.editar_jugador)
@@ -304,12 +536,15 @@ class PaginaEquipos(QWidget):
         fila = QHBoxLayout()
         fila.addWidget(boton("Agregar", self.nuevo_equipo))
         fila.addWidget(boton("Editar", self.editar_equipo, "secundario"))
+        fila.addWidget(boton("Pase de lista", self.pase_de_lista, "secundario"))
         fila.addWidget(
             boton_mas(
-                "Más",
+                "Más opciones",
                 [
-                    ("Disponibilidad", self.editar_disponibilidad),
-                    ("Credenciales PDF", self.generar_credenciales),
+                    ("Días y horas en que puede jugar", self.editar_disponibilidad),
+                    ("Credenciales en PDF", self.generar_credenciales),
+                    ("Hoja de registro en Excel (con pase de lista)", self.exportar_registro),
+                    ("Descargar plantilla de Excel vacía", self.descargar_plantilla),
                     ("Eliminar equipo", self.borrar_equipo),
                 ],
             )
@@ -333,6 +568,9 @@ class PaginaEquipos(QWidget):
 
         raiz = QVBoxLayout(self)
         raiz.addWidget(QLabel("Equipos y jugadores", objectName="titulo"))
+        raiz.addWidget(ayuda_pagina(
+            "Toca un equipo para ver sus jugadores. Para registrar equipos completos de una vez, pulsa «Importar Excel» y elige las hojas de registro de los clubes."
+        ))
         raiz.addWidget(self.filtros)
         raiz.addLayout(excel_fila)
         raiz.addLayout(columnas)
@@ -417,9 +655,13 @@ class PaginaEquipos(QWidget):
         self.refrescar_jugadores()
 
     def refrescar_jugadores(self):
+        equipo_id = id_seleccionado(self.tabla_equipos)
         filas = self.conn.execute(
-            "SELECT * FROM jugadores WHERE equipo_id = ? ORDER BY numero",
-            (id_seleccionado(self.tabla_equipos),),
+            "SELECT * FROM jugadores WHERE equipo_id = ? ORDER BY numero IS NULL, numero, nombre COLLATE ES",
+            (equipo_id,),
+        )
+        asistencias, con_lista = (
+            asistencia.resumen_de_equipo(self.conn, equipo_id) if equipo_id is not None else ({}, 0)
         )
         llenar(
             self.tabla_jugadores,
@@ -429,7 +671,9 @@ class PaginaEquipos(QWidget):
                     [
                         j["numero"], j["nombre"],
                         date.fromisoformat(j["fecha_nacimiento"]).strftime("%d/%m/%Y"),
-                        j["posicion"], "Sí" if j["foto"] else "No",
+                        j["posicion"],
+                        f"{asistencias.get(j['id'], 0)} de {con_lista}" if con_lista else "-",
+                        "Sí" if j["foto"] else "No",
                     ],
                 )
                 for j in filas
@@ -579,20 +823,21 @@ class PaginaEquipos(QWidget):
                 return
         datos = (
             dialogo.nombre.text().strip(), dialogo.fecha_nacimiento().isoformat(),
-            dialogo.numero.value(), dialogo.posicion.currentText(), foto_nueva or foto,
+            dialogo.numero_playera(), dialogo.posicion.currentText(), foto_nueva or foto,
+            dialogo.curp_limpia(),
         )
         try:
             with self.conn:
                 if jugador:
                     self.conn.execute(
                         "UPDATE jugadores SET nombre = ?, fecha_nacimiento = ?, numero = ?, "
-                        "posicion = ?, foto = ? WHERE id = ?",
+                        "posicion = ?, foto = ?, curp = ? WHERE id = ?",
                         (*datos, jugador["id"]),
                     )
                 else:
                     self.conn.execute(
                         "INSERT INTO jugadores (nombre, fecha_nacimiento, numero, posicion, foto, "
-                        "equipo_id) VALUES (?, ?, ?, ?, ?, ?)",
+                        "curp, equipo_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
                         (*datos, equipo_id),
                     )
         except sqlite3.IntegrityError:
@@ -638,9 +883,45 @@ class PaginaEquipos(QWidget):
         if self._torneo_id() is None:
             error(self, "Primero crea un torneo para esta liga en «Ligas y categorías».")
             return
-        ruta, _ = QFileDialog.getOpenFileName(self, "Importar jugadores", "", "Excel (*.xlsx)")
-        if not ruta:
+        rutas, _ = QFileDialog.getOpenFileNames(
+            self, "Elige uno o varios archivos de Excel", str(Path.home()), "Excel (*.xlsx)"
+        )
+        if not rutas:
             return
+        if all(registro.es_hoja_de_registro(r) for r in rutas):
+            self._importar_registros(rutas)
+        elif len(rutas) == 1:
+            self._importar_plantilla(rutas[0])
+        else:
+            error(
+                self,
+                "Para importar varios archivos a la vez, todos deben ser hojas de registro de equipo "
+                "(con «NOMBRE DEL CLUB» y «NOMBRE COMPLETO»). La plantilla del programa se importa sola.",
+            )
+
+    def _importar_registros(self, rutas: list[str]):
+        try:
+            registros = registro.leer(rutas)
+        except ValueError as exc:
+            error(self, str(exc))
+            return
+        registro.preparar(self.conn, registros, self._torneo_id())
+        if not DialogoRegistros(self, self.conn, registros, self._torneo_id(), self._categorias()).exec():
+            return
+        nuevos, actualizados, equipos, categorias = registro.importar(
+            self.conn, registros, self._torneo_id(), fotos_dir()
+        )
+        self._avisar_cambio()
+        lineas = [
+            f"Importación terminada en el torneo «{self.torneo.currentText()}».", "",
+            f"Equipos creados: {equipos}", f"Jugadores nuevos: {nuevos}",
+            f"Jugadores actualizados: {actualizados}",
+        ]
+        if categorias:
+            lineas.append(f"Categorías creadas: {categorias}")
+        info(self, "\n".join(lineas))
+
+    def _importar_plantilla(self, ruta: str):
         try:
             filas = excel.analizar(self.conn, ruta, self._torneo_id())
         except ValueError as exc:
@@ -659,6 +940,43 @@ class PaginaEquipos(QWidget):
             f"Jugadores nuevos: {nuevos}\nJugadores actualizados: {actualizados}\n"
             f"Equipos creados: {equipos}",
         )
+
+    def _equipo_elegido(self) -> tuple[int, str] | None:
+        equipo_id = id_seleccionado(self.tabla_equipos)
+        if equipo_id is None:
+            error(self, "Primero toca un equipo de la lista.")
+            return None
+        return equipo_id, self.tabla_equipos.item(self.tabla_equipos.currentRow(), 0).text()
+
+    def pase_de_lista(self):
+        elegido = self._equipo_elegido()
+        if elegido is None:
+            return
+        equipo_id, nombre = elegido
+        if not asistencia.partidos_de_equipo(self.conn, equipo_id):
+            error(self, f"«{nombre}» todavía no tiene partidos en el rol. El pase de lista es por partido.")
+            return
+        if self.tabla_jugadores.rowCount() == 0:
+            error(self, "Este equipo todavía no tiene jugadores.")
+            return
+        if DialogoListaEquipo(self, self.conn, equipo_id, nombre).exec():
+            self.refrescar_jugadores()
+
+    def exportar_registro(self):
+        elegido = self._equipo_elegido()
+        if elegido is None:
+            return
+        equipo_id, nombre = elegido
+        sugerido = str(Path.home() / f"Registro {_nombre_archivo(nombre)}.xlsx")
+        ruta, _ = QFileDialog.getSaveFileName(self, "Guardar hoja de registro", sugerido, "Excel (*.xlsx)")
+        if not ruta:
+            return
+        try:
+            registro.exportar(self.conn, equipo_id, ruta)
+        except PermissionError:
+            error(self, "No se pudo guardar: el archivo está abierto en Excel.")
+            return
+        os.startfile(ruta)
 
     def generar_credenciales(self):
         equipo_id = id_seleccionado(self.tabla_equipos)
@@ -680,6 +998,10 @@ class PaginaEquipos(QWidget):
             error(self, "No se pudo guardar: el archivo está abierto en otro programa.")
             return
         os.startfile(ruta)
+
+
+def _cuantos(n: int, singular: str, plural: str) -> str:
+    return f"{n} {singular if n == 1 else plural}"
 
 
 def _nombre_archivo(texto: str) -> str:
