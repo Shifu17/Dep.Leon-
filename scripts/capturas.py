@@ -20,7 +20,7 @@ sys.path.insert(0, str(RAIZ))
 from PySide6.QtGui import QFont, QFontDatabase  # noqa: E402
 from PySide6.QtWidgets import QApplication, QPushButton  # noqa: E402
 
-from dep_leon import acceso, asistencia, cobros, db, liguilla, lienzo, reportes, resultados, rol, updater  # noqa: E402
+from dep_leon import acceso, arbitros, asistencia, cobros, db, liguilla, lienzo, reportes, resultados, rol, updater  # noqa: E402
 from dep_leon.paths import db_path  # noqa: E402
 from dep_leon.ui.acceso import DialogoAcceso  # noqa: E402
 from dep_leon.ui.tema import ESTILO  # noqa: E402
@@ -69,6 +69,8 @@ def preparar(conn):
     rol.generar(conn, torneo, ids, rol.Horario(inicio, {5: (540, 840)}), azar=random.Random(7))
 
     azar = random.Random(11)
+    # Árbitros inventados, sin foto: se ven con sus iniciales.
+    silbantes = [arbitros.guardar(conn, n, "8440000000") for n in ("Árbitro Uno", "Árbitro Dos", "Árbitro Tres")]
     for p in conn.execute(
         "SELECT * FROM partidos WHERE fecha < ? ORDER BY fecha", (hoy.isoformat(),)
     ).fetchall():
@@ -85,6 +87,7 @@ def preparar(conn):
             plantel = [j["id"] for j in conn.execute("SELECT id FROM jugadores WHERE equipo_id = ?", (equipo,))]
             vinieron |= set(azar.sample(plantel, azar.randint(3, len(plantel))))
         asistencia.guardar(conn, p["id"], vinieron)
+        arbitros.asignar(conn, p["id"], azar.choice(silbantes), azar.choice([3, 4, 4, 5, 5]))
 
     aguilas = conn.execute(
         "SELECT id FROM equipos WHERE nombre = 'Águilas' AND categoria_id = ?", (ids[0],)
@@ -161,6 +164,17 @@ def main():
         tabla.selectRow(next(f for f in range(tabla.rowCount()) if tabla.item(f, 0).text() == "Águilas"))
 
     capturar("Equipos y jugadores", "equipos.png", equipo_con_lista)
+    capturar("Árbitros", "arbitros.png")
+
+    from dep_leon.ui import pagina_resultados as ui_resultados  # noqa: E402
+
+    jugado = conn.execute("SELECT p.id FROM partidos p JOIN arbitrajes x ON x.partido_id = p.id LIMIT 1").fetchone()
+    fila = ui_resultados._partido_completo(conn, jugado["id"])
+    captura = ui_resultados.DialogoResultado(ventana, conn, fila, fila["local"], fila["visitante"])
+    captura.show()
+    app.processEvents()
+    captura.grab().save(str(DESTINO / "calificar_arbitro.png"))
+    captura.close()
     from dep_leon.ui.pagina_equipos import DialogoListaEquipo  # noqa: E402
 
     aguilas_infantil = conn.execute(

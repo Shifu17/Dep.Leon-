@@ -198,6 +198,18 @@ CREATE TABLE IF NOT EXISTS asistencias (
     jugador_id INTEGER NOT NULL REFERENCES jugadores(id) ON DELETE CASCADE,
     PRIMARY KEY (partido_id, jugador_id)
 );
+CREATE TABLE IF NOT EXISTS arbitros (
+    id INTEGER PRIMARY KEY,
+    nombre TEXT NOT NULL UNIQUE,
+    telefono TEXT NOT NULL DEFAULT '',
+    foto TEXT NOT NULL DEFAULT '',
+    activo INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS arbitrajes (
+    partido_id INTEGER PRIMARY KEY REFERENCES partidos(id) ON DELETE CASCADE,
+    arbitro_id INTEGER NOT NULL REFERENCES arbitros(id) ON DELETE RESTRICT,
+    calificacion INTEGER CHECK (calificacion BETWEEN 1 AND 5)
+);
 CREATE TABLE IF NOT EXISTS config_rol (
     torneo_id INTEGER PRIMARY KEY REFERENCES torneos(id) ON DELETE CASCADE,
     datos TEXT NOT NULL

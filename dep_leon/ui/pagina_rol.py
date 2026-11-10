@@ -304,7 +304,7 @@ class PaginaRol(QWidget):
         filtros.addWidget(self.fecha, 1)
 
         self.tabla = tabla(
-            ["Fecha", "Hora", "Equipo", "Equipo", "Categoría", "Cancha", "Fase", "Estado"], estirar=2
+            ["Fecha", "Hora", "Equipo", "Equipo", "Categoría", "Cancha", "Fase", "Estado", "Árbitro"], estirar=2
         )
         self.tabla.horizontalHeader().setSectionResizeMode(
             3, self.tabla.horizontalHeader().ResizeMode.Stretch
@@ -318,6 +318,9 @@ class PaginaRol(QWidget):
         acciones.addWidget(boton("Generar rol", self.generar))
         acciones.addWidget(boton("Agregar partido", self.agregar, "secundario"))
         acciones.addWidget(boton("Editar o reprogramar", self.editar, "secundario"))
+        arbitro = boton("Asignar árbitro", self.asignar_arbitro, "secundario")
+        arbitro.setToolTip("Elige quién pitará el partido seleccionado.")
+        acciones.addWidget(arbitro)
         acciones.addWidget(
             boton_mas("Más", [("Posponer partido", self.posponer), ("Eliminar partido", self.eliminar)])
         )
@@ -385,9 +388,11 @@ class PaginaRol(QWidget):
         )
         # Con una fecha elegida también se ven los pospuestos, para no perderlos de vista.
         filas = self.conn.execute(
-            """SELECT p.*, l.nombre AS local, v.nombre AS visitante, c.nombre AS categoria
+            """SELECT p.*, l.nombre AS local, v.nombre AS visitante, c.nombre AS categoria,
+                      a.nombre AS arbitro
                FROM partidos p JOIN equipos l ON l.id = p.local_id
                JOIN equipos v ON v.id = p.visitante_id JOIN categorias c ON c.id = p.categoria_id
+               LEFT JOIN arbitrajes x ON x.partido_id = p.id LEFT JOIN arbitros a ON a.id = x.arbitro_id
                WHERE p.torneo_id = ? AND (? IS NULL OR p.categoria_id = ?)
                  AND (? IS NULL OR p.fecha = ? OR p.fecha IS NULL)
                ORDER BY p.fecha IS NULL, p.fecha, p.cancha, p.hora""",
@@ -403,6 +408,7 @@ class PaginaRol(QWidget):
                         p["hora"] or "-",
                         p["local"], p["visitante"], p["categoria"],
                         rol.nombre_cancha(p["cancha"]), rol.nombre_jornada(p["jornada"]), p["estado"],
+                        p["arbitro"] or "-",
                     ],
                 )
                 for p in filas
@@ -509,6 +515,13 @@ class PaginaRol(QWidget):
         partido = self._partido_seleccionado()
         if partido is not None and editar_partido(self, self.conn, partido["id"]):
             self._al_cambiar_torneo()
+
+    def asignar_arbitro(self):
+        from .pagina_arbitros import asignar_arbitro
+
+        partido = self._partido_seleccionado()
+        if partido is not None and asignar_arbitro(self, self.conn, partido["id"]):
+            self.refrescar_partidos()
 
     def posponer(self):
         partido = self._partido_seleccionado()

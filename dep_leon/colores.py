@@ -31,6 +31,7 @@ VERDE = "#1E7F4C"
 VERDE_ACTIVO = "#176A3E"
 VERDE_SUAVE = "#D3EADC"
 DORADO = "#C9A24B"
+ESTRELLA = "#B8892A"  # dorado más firme: las estrellas se distinguen del fondo blanco (3:1)
 
 # Estados
 ROJO = "#A8261C"

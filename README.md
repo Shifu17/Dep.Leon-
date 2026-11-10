@@ -32,6 +32,7 @@ tus datos se quedan en ella.
 | **Pase de lista** | Anotar quién vino a cada partido y ver la asistencia de cada jugador, como las columnas J1, J2… de la hoja de registro. |
 | **Rol de juegos** | Generar jornadas, repartir partidos según la disponibilidad de cada equipo y evitar empalmes de cancha. |
 | **Resultados** | Capturar marcadores y goleadores, posponer partidos o darlos por default indicando quién paga. |
+| **Árbitros** | Registrar árbitros con foto, asignar uno a cada partido y calificarlo de 1 a 5 estrellas al capturar el resultado. |
 | **Estadísticas** | Consultar clasificación, tabla de goleadores y portería menos goleada, con puntos configurables. |
 | **Liguilla** | Elegir el rango de clasificados y armar la llave a partido único; el ganador avanza solo hasta el campeón. |
 | **Cobros** | Llevar inscripciones, arbitrajes, abonos y adeudos, con recibos en PDF. |
@@ -50,6 +51,10 @@ tus datos se quedan en ella.
 | Equipos y jugadores | Pase de lista |
 |---|---|
 | ![Equipos con sus jugadores y la asistencia de cada uno](docs/img/equipos.png) | ![Cuadrícula de asistencia por partido, J1 a J5](docs/img/pase_de_lista.png) |
+
+| Árbitros | Calificar al árbitro |
+|---|---|
+| ![Árbitros con su promedio de estrellas y sus partidos](docs/img/arbitros.png) | ![Captura de resultado con el árbitro y sus estrellas](docs/img/calificar_arbitro.png) |
 
 **Imagen lista para WhatsApp:**
 

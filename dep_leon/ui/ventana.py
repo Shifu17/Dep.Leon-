@@ -24,6 +24,7 @@ from ..paths import asset, data_dir, fotos_dir
 from .acceso import pedir_acceso
 from . import diseno
 from .comun import error, info, logo
+from .pagina_arbitros import PaginaArbitros
 from .pagina_cobros import PaginaCobros
 from .pagina_config import PaginaConfig
 from .pagina_equipos import PaginaEquipos
@@ -71,6 +72,7 @@ class Ventana(QMainWindow):
         self.equipos = PaginaEquipos(conn)
         self.rol = PaginaRol(conn)
         self.resultados = PaginaResultados(conn)
+        self.arbitros = PaginaArbitros(conn)
         self.estadisticas = PaginaEstadisticas(conn)
         self.liguilla = PaginaLiguilla(conn)
         self.cobros = PaginaCobros(conn)
@@ -151,9 +153,12 @@ class Ventana(QMainWindow):
             nav.setIconSize(QSize(26, 18))
             nav.setFocusPolicy(Qt.FocusPolicy.TabFocus)
             nav.clicked.connect(lambda: self._mostrar(pagina))
-            atajo = str((len(self._navegacion) + 1) % 10)
-            nav.setToolTip(f"Ctrl+{atajo}")
-            QShortcut(QKeySequence(f"Ctrl+{atajo}"), self).activated.connect(nav.click)
+            # Ctrl+1 a Ctrl+9 en orden y Ctrl+0 para Configuración; las que sobran van sin atajo.
+            posicion = len(self._navegacion) + 1
+            atajo = "0" if pagina is self.config else str(posicion) if posicion <= 9 else None
+            if atajo:
+                nav.setToolTip(f"Ctrl+{atajo}")
+                QShortcut(QKeySequence(f"Ctrl+{atajo}"), self).activated.connect(nav.click)
             self._navegacion[pagina] = nav
             grupo.addButton(nav)
             columna.addWidget(nav)
@@ -164,6 +169,7 @@ class Ventana(QMainWindow):
         agregar("Equipos y jugadores", self.equipos, "equipos")
         agregar("Rol de juegos", self.rol, "rol")
         agregar("Resultados", self.resultados, "resultados")
+        agregar("Árbitros", self.arbitros, "arbitros")
         agregar("Estadísticas", self.estadisticas, "estadisticas")
         agregar("Liguilla", self.liguilla, "liguilla")
         agregar("Cobros", self.cobros, "cobros")

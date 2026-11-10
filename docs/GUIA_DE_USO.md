@@ -180,6 +180,21 @@ Si un equipo no llegó, pulsa **No se presentó** y elige:
   ausente, el presente, ambos o ninguno.
 - **Posponer:** el partido queda pendiente de nueva fecha y no genera cobro.
 
+### Árbitros
+
+En la pantalla **Árbitros** registras a cada árbitro con **Agregar árbitro**: nombre, teléfono y foto. Al
+tocar uno ves su ficha, con su promedio de estrellas y los partidos que ha dirigido.
+
+- **Asignar el árbitro de un partido:** en **Rol de juegos**, selecciona el partido y pulsa **Asignar
+  árbitro**. También puedes elegirlo al capturar el resultado.
+- **Calificarlo:** en **Capturar resultado**, debajo de los jugadores, elige al árbitro y toca de 1 a 5
+  estrellas en **¿Cómo arbitró?** (1 Malo, 2 Regular, 3 Bueno, 4 Muy bueno, 5 Excelente). Tocar otra vez
+  la misma estrella quita la calificación. Con el teclado: números del 1 al 5, o las flechas.
+- **Si un árbitro ya no trabaja con la liga:** **Eliminar** solo borra a los que no tienen partidos. Si ya
+  tiene, el programa ofrece **darlo de baja**: deja de aparecer al asignar, pero se conserva su historial.
+
+![Árbitros con su promedio de estrellas y los partidos que han dirigido](img/arbitros.png)
+
 ## 6. Consultar estadísticas
 
 En **Estadísticas**, elige torneo y categoría para ver:
@@ -278,7 +293,8 @@ Equipos, Rol, Resultados y Cobros puedes buscar por nombre; en Equipos también 
 
 | Tecla | Qué hace |
 |---|---|
-| **Ctrl+1** a **Ctrl+9** y **Ctrl+0** | Cambiar de pantalla, en el orden del menú |
+| **Ctrl+1** a **Ctrl+9** | Cambiar de pantalla, en el orden del menú (Reportes no tiene atajo) |
+| **Ctrl+0** | Ir a Configuración |
 | **Ctrl+F** | Ir al buscador de la pantalla |
 | **F5** | Actualizar la pantalla |
 | **Tab** | Pasar al siguiente control |

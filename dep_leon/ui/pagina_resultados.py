@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import asistencia, liguilla, resultados, rol
+from .. import arbitros, asistencia, liguilla, resultados, rol
 from . import diseno
 from .comun import (
     ayuda_pagina,
@@ -34,6 +34,7 @@ from .comun import (
     llenar,
     tabla,
 )
+from .estrellas import CalificacionArbitro
 from .filtros import FiltrosLiga
 from .lista import ColumnaEquipo, pasar_lista
 from .tema import ROJO
@@ -101,6 +102,27 @@ class DialogoResultado(QDialog):
             fila.addStretch(1)
             raiz.addLayout(fila)
 
+        # El árbitro del partido y cómo lo hizo, de 1 a 5 estrellas.
+        from .pagina_arbitros import combo_arbitros  # aquí, para no crear un ciclo al importar
+
+        previo_arbitro = arbitros.de_partido(conn, partido["id"])
+        self._arbitro_previo = previo_arbitro
+        self.arbitro = combo_arbitros(conn, previo_arbitro["id"] if previo_arbitro else None)
+        self.arbitro.setMinimumWidth(220)
+        self.calificacion = CalificacionArbitro((previo_arbitro["calificacion"] or 0) if previo_arbitro else 0)
+        self.arbitro.currentIndexChanged.connect(self._al_cambiar_arbitro)
+        arbitraje = QHBoxLayout()
+        arbitraje.setSpacing(10)
+        arbitraje.addWidget(etiqueta("Árbitro:", self.arbitro))
+        arbitraje.addWidget(self.arbitro)
+        arbitraje.addSpacing(18)
+        arbitraje.addWidget(QLabel("¿Cómo arbitró?"))
+        arbitraje.addWidget(self.calificacion, 1)
+        if self.arbitro.count() == 1:
+            arbitraje.addWidget(QLabel("Registra árbitros en la página «Árbitros».", objectName="ayuda"))
+        raiz.addLayout(arbitraje)
+        self.calificacion.setEnabled(self.arbitro.currentData() is not None)
+
         raiz.addWidget(
             QLabel(
                 "Marca quién vino y, si quieres, quién anotó. Puedes dejar goles sin jugador "
@@ -116,6 +138,15 @@ class DialogoResultado(QDialog):
     def goles(self) -> dict:
         """Control de goles de cada jugador de los dos equipos."""
         return {**self.local.goles, **self.visitante.goles}
+
+    def _al_cambiar_arbitro(self):
+        # La calificación era para el árbitro anterior: con otro se empieza de cero.
+        previo = self._arbitro_previo
+        if previo and self.arbitro.currentData() == previo["id"]:
+            self.calificacion.estrellas.setValor(previo["calificacion"] or 0)
+        else:
+            self.calificacion.estrellas.setValor(0)
+        self.calificacion.setEnabled(self.arbitro.currentData() is not None)
 
     def goleadores(self) -> dict[int, int]:
         return {**self.local.goleadores(), **self.visitante.goleadores()}
@@ -133,6 +164,11 @@ class DialogoResultado(QDialog):
             asistencia.guardar(
                 self.conn, self.partido["id"],
                 self.local.presentes() | self.visitante.presentes() | set(self.goleadores()),
+            )
+            arbitro_id = self.arbitro.currentData()
+            arbitros.asignar(
+                self.conn, self.partido["id"], arbitro_id,
+                self.calificacion.valor() if arbitro_id is not None else None,
             )
         except ValueError as exc:
             self.aviso.mostrar(str(exc))
@@ -231,6 +267,14 @@ def borrar_resultado(padre: QWidget, conn: sqlite3.Connection, partido_id: int) 
     return True
 
 
+def _arbitro(partido) -> str:
+    if not partido["arbitro"]:
+        return "-"
+    if partido["calificacion"]:
+        return f"{partido['arbitro']} ({partido['calificacion']} de 5)"
+    return partido["arbitro"]
+
+
 def _estado(partido) -> str:
     """Un partido cuya fecha ya pasó y no tiene resultado se señala como atrasado."""
     if partido["estado"] == rol.PROGRAMADO and partido["fecha"] and partido["fecha"] < rol.hoy().isoformat():
@@ -268,7 +312,7 @@ class PaginaResultados(QWidget):
         self.fila_acciones = acciones
 
         self.tabla = tabla(
-            ["Fecha", "Hora", "Equipo", "Marcador", "Equipo", "Categoría", "Fase", "Estado"], estirar=2
+            ["Fecha", "Hora", "Equipo", "Marcador", "Equipo", "Categoría", "Fase", "Estado", "Árbitro"], estirar=2
         )
         self.tabla.horizontalHeader().setSectionResizeMode(
             4, self.tabla.horizontalHeader().ResizeMode.Stretch
@@ -304,10 +348,11 @@ class PaginaResultados(QWidget):
         # Lo más antiguo primero: son los primeros que deberían estar ya capturados.
         filas = self.conn.execute(
             f"""SELECT p.*, l.nombre AS local, v.nombre AS visitante, c.nombre AS categoria,
-                       r.goles_local, r.goles_visitante
+                       r.goles_local, r.goles_visitante, a.nombre AS arbitro, x.calificacion
                 FROM partidos p JOIN equipos l ON l.id = p.local_id
                 JOIN equipos v ON v.id = p.visitante_id JOIN categorias c ON c.id = p.categoria_id
                 LEFT JOIN resultados r ON r.partido_id = p.id
+                LEFT JOIN arbitrajes x ON x.partido_id = p.id LEFT JOIN arbitros a ON a.id = x.arbitro_id
                 WHERE p.torneo_id = ? AND (? IS NULL OR p.categoria_id = ?) AND {condicion}
                 ORDER BY p.fecha IS NULL, p.fecha, p.hora, p.cancha""",
             (self.filtros.torneo_id, categoria, categoria),
@@ -322,6 +367,7 @@ class PaginaResultados(QWidget):
                         p["hora"] or "-", p["local"],
                         f"{p['goles_local']} - {p['goles_visitante']}" if p["goles_local"] is not None else "-",
                         p["visitante"], p["categoria"], rol.nombre_jornada(p["jornada"]), _estado(p),
+                        _arbitro(p),
                     ],
                 )
                 for p in filas

@@ -47,6 +47,7 @@ ICONOS = {
     "copiar": "",
     "imagen": "",
     "persona": "",
+    "arbitros": "",
 }
 
 # El icono de un botón se elige por la primera palabra de su texto: así todos los botones que hacen
@@ -58,7 +59,7 @@ _ICONO_POR_VERBO = {
     "importar": "importar", "restaurar": "importar",
     "exportar": "exportar", "descargar": "exportar", "guardar": "exportar",
     "credenciales": "credencial", "recibo": "imprimir",
-    "pase": "lista", "registrar": "pago", "copiar": "copiar", "buscar": "buscar",
+    "pase": "lista", "asignar": "arbitros", "registrar": "pago", "copiar": "copiar", "buscar": "buscar",
 }
 
 
