@@ -18,7 +18,9 @@ VERDE = (colores.VERDE_SUAVE, colores.VERDE_ACTIVO, "#9CCBAE")  # el borde lo se
 DORADO = (colores.DORADO_SUAVE, colores.DORADO_TEXTO, colores.DORADO_SUAVE)
 GRIS = (colores.CAMPO_DESACTIVADO, colores.TEXTO_SUAVE, colores.BORDE)
 
-MODALIDAD = {"Fut 7": VERDE, "Fut 11": DORADO}
+AZUL = (colores.AZUL_SUAVE, colores.AZUL_TEXTO, colores.AZUL_SUAVE)
+MORADO = (colores.MORADO_SUAVE, colores.MORADO_TEXTO, colores.MORADO_SUAVE)
+MODALIDAD = {"Fut 7": VERDE, "Fut 8": AZUL, "Fut 9": MORADO, "Fut 11": DORADO}
 ESTADO_TORNEO = {"Activo": VERDE, "Próximo": DORADO, "Finalizado": GRIS}
 
 _ALTO = 22
@@ -73,9 +75,15 @@ class DelegadoChips(QStyledItemDelegate):
         alto = _ALTO - (4 if self._pequeno else 0)
         x = opcion.rect.x() + 6
         y = opcion.rect.y() + (opcion.rect.height() - alto) / 2
-        for parte, ancho in zip(partes, self._anchos(opcion, partes)):
-            if x + ancho > opcion.rect.right() - 2:
-                break  # lo que no cabe se lee en el tooltip de la celda
+        medida = QFontMetrics(pintor.font())
+        for i, (parte, ancho) in enumerate(zip(partes, self._anchos(opcion, partes))):
+            disponible = opcion.rect.right() - 2 - x
+            if ancho > disponible:
+                if i:
+                    break  # lo que no cabe se lee en el tooltip de la celda
+                # Ni el primero cabe: se acorta con «…» en lugar de desaparecer.
+                ancho = max(disponible, alto)
+                parte = medida.elidedText(parte, Qt.TextElideMode.ElideRight, int(ancho - 2 * (_RELLENO - 3)))
             fondo, letra, borde = self._estilo(parte)
             caja = QRectF(x, y, ancho, alto)
             pintor.setPen(QPen(QColor(borde), 1))

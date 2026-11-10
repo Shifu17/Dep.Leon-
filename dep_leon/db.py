@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS categorias (
     nombre TEXT NOT NULL,
     anio_min INTEGER,
     anio_max INTEGER,
+    modalidad TEXT NOT NULL DEFAULT '',
     UNIQUE (liga_id, nombre)
 );
 CREATE TABLE IF NOT EXISTS torneos (
@@ -245,6 +246,10 @@ def _migrar(conn: sqlite3.Connection) -> None:
         if columna not in del_equipo:
             with conn:
                 conn.execute(f"ALTER TABLE equipos ADD COLUMN {columna} TEXT NOT NULL DEFAULT ''")
+    if "modalidad" not in {c["name"] for c in conn.execute("PRAGMA table_info(categorias)")}:
+        # Hasta la 0.9.11 la modalidad era de toda la liga; en las infantiles hay Fut 7, 8 y 9.
+        with conn:
+            conn.execute("ALTER TABLE categorias ADD COLUMN modalidad TEXT NOT NULL DEFAULT ''")
     _migrar_jugadores(conn)
     _migrar_calificaciones(conn)
     _migrar_temporadas(conn)

@@ -36,7 +36,6 @@ from .comun import (
     tabla,
 )
 
-MODALIDADES = ["Fut 7", "Fut 11"]
 
 
 class DialogoLiga(QDialog):
@@ -45,7 +44,7 @@ class DialogoLiga(QDialog):
         self.setWindowTitle("Liga")
         self.nombre = QLineEdit(liga["nombre"] if liga else "")
         self.modalidad = QComboBox()
-        self.modalidad.addItems(MODALIDADES)
+        self.modalidad.addItems(rol.MODALIDADES_LIGA)
         self.dias = QLineEdit(liga["dias"] if liga else "")
         self.dias.setPlaceholderText("Ejemplo: Viernes y sábado")
         campos.solo_nombre_de_equipo(self.nombre, "Ejemplo: Libre Martes")
@@ -69,9 +68,15 @@ class DialogoLiga(QDialog):
 
 
 class DialogoCategoria(QDialog):
-    def __init__(self, padre, categoria=None):
+    def __init__(self, padre, categoria=None, modalidad_liga: str = "Fut 7"):
         super().__init__(padre)
         self.setWindowTitle("Categoría")
+        self.modalidad = QComboBox()
+        self.modalidad.addItem(f"Igual que la liga ({modalidad_liga})", "")
+        for modalidad in rol.MODALIDADES:
+            self.modalidad.addItem(modalidad, modalidad)
+        if categoria is not None:
+            self.modalidad.setCurrentIndex(max(0, self.modalidad.findData(categoria["modalidad"])))
         hoy = date.today().year
         self.nombre = QLineEdit(categoria["nombre"] if categoria else "")
         self.nombre.setPlaceholderText("Ejemplo: 2015-2016 o Libre")
@@ -90,6 +95,9 @@ class DialogoCategoria(QDialog):
         self.nombre.editingFinished.connect(self._completar_desde_nombre)
         forma = QFormLayout(self)
         self.error_nombre = fila_con_error(forma, "Nombre:", self.nombre)
+        forma.addRow("Se juega en:", self.modalidad)
+        forma.addRow("", QLabel("Fut 7 y Fut 8 usan la Cancha 1 o la 2; Fut 9 y Fut 11, la cancha completa.",
+                                objectName="ayuda", wordWrap=True))
         forma.addRow(self.sin_limite)
         forma.addRow("Nacidos desde:", self.anio_min)
         self.error_anios = fila_con_error(forma, "Nacidos hasta:", self.anio_max)
@@ -119,6 +127,9 @@ class DialogoCategoria(QDialog):
             self.error_anios.mostrar("El año «desde» no puede ser mayor que el año «hasta».")
             return
         self.accept()
+
+    def modalidad_elegida(self) -> str:
+        return self.modalidad.currentData()
 
     def valores(self):
         nombre = nombre_categoria(self.nombre.text())
@@ -163,7 +174,9 @@ class PaginaLigas(QWidget):
         self.tabla_ligas.setWordWrap(False)
         chips_en(self.tabla_ligas, 1, lambda texto: MODALIDAD.get(texto, NEUTRO))
         chips_en(self.tabla_ligas, 2, separar=separar_dias, pequeno=True)
-        self.tabla_categorias = tabla(["Categoría", "Nacidos"], estirar=0)
+        self.tabla_categorias = tabla(["Categoría", "Nacidos", "Juego"], estirar=0)
+        chips_en(self.tabla_categorias, 2, lambda texto: MODALIDAD.get(texto, NEUTRO), pequeno=True)
+        self.tabla_categorias.horizontalHeaderItem(2).setToolTip("Modalidad en que juega la categoría")
         self.tabla_torneos = tabla(["Temporada", "Estado"], estirar=0)
         chips_en(self.tabla_torneos, 1, lambda texto: ESTADO_TORNEO.get(texto, NEUTRO), pequeno=True)
         self.tabla_torneos.setToolTip(
@@ -201,12 +214,12 @@ class PaginaLigas(QWidget):
             self.titulo_categorias, self.tabla_categorias, "Agregar", self.nueva_categoria,
             [("Editar categoría", self.editar_categoria), ("Eliminar categoría", self.borrar_categoria)],
             "la categoría",
-        ), 3)
+        ), 4)
         columnas.addLayout(self._columna(
             self.titulo_torneos, self.tabla_torneos, "Agregar", self.nuevo_torneo,
             [("Editar torneo", self.editar_torneo), ("Eliminar torneo", self.borrar_torneo)],
             "el torneo",
-        ), 3)
+        ), 2)
 
         raiz = QVBoxLayout(self)
         raiz.addWidget(diseno.encabezado(
@@ -247,7 +260,7 @@ class PaginaLigas(QWidget):
 
     def refrescar_detalle(self):
         liga_id = id_seleccionado(self.tabla_ligas)
-        liga = self.conn.execute("SELECT nombre FROM ligas WHERE id = ?", (liga_id,)).fetchone()
+        liga = self.conn.execute("SELECT nombre, modalidad FROM ligas WHERE id = ?", (liga_id,)).fetchone()
         self.titulo_categorias.setText(f"Categorías de {liga['nombre']}" if liga else "Categorías")
         self.titulo_torneos.setText(f"Torneos de {liga['nombre']}" if liga else "Torneos")
         categorias = self.conn.execute(
@@ -255,7 +268,7 @@ class PaginaLigas(QWidget):
         ).fetchall()
         llenar(
             self.tabla_categorias,
-            [(c["id"], [c["nombre"], _rango(c)]) for c in categorias],
+            [(c["id"], [c["nombre"], _rango(c), c["modalidad"] or liga["modalidad"]]) for c in categorias],
         )
         self._marcar_encimadas(categorias)
         torneos = self.conn.execute(
@@ -347,11 +360,12 @@ class PaginaLigas(QWidget):
         liga_id = self._liga_actual()
         if liga_id is None:
             return
-        dialogo = DialogoCategoria(self)
+        liga = self.conn.execute("SELECT modalidad FROM ligas WHERE id = ?", (liga_id,)).fetchone()
+        dialogo = DialogoCategoria(self, modalidad_liga=liga["modalidad"])
         if dialogo.exec() and self._aviso_encimada(liga_id, *dialogo.valores()):
             self._guardar(
-                "INSERT INTO categorias (nombre, anio_min, anio_max, liga_id) VALUES (?, ?, ?, ?)",
-                (*dialogo.valores(), liga_id), "Ya existe esa categoría en esta liga.",
+                "INSERT INTO categorias (nombre, anio_min, anio_max, modalidad, liga_id) VALUES (?, ?, ?, ?, ?)",
+                (*dialogo.valores(), dialogo.modalidad_elegida(), liga_id), "Ya existe esa categoría en esta liga.",
             )
 
     def editar_categoria(self):
@@ -362,11 +376,12 @@ class PaginaLigas(QWidget):
         categoria = self.conn.execute(
             "SELECT * FROM categorias WHERE id = ?", (categoria_id,)
         ).fetchone()
-        dialogo = DialogoCategoria(self, categoria)
+        liga = self.conn.execute("SELECT modalidad FROM ligas WHERE id = ?", (categoria["liga_id"],)).fetchone()
+        dialogo = DialogoCategoria(self, categoria, liga["modalidad"])
         if dialogo.exec() and self._aviso_encimada(categoria["liga_id"], *dialogo.valores(), sin_id=categoria_id):
             self._guardar(
-                "UPDATE categorias SET nombre = ?, anio_min = ?, anio_max = ? WHERE id = ?",
-                (*dialogo.valores(), categoria_id), "Ya existe esa categoría en esta liga.",
+                "UPDATE categorias SET nombre = ?, anio_min = ?, anio_max = ?, modalidad = ? WHERE id = ?",
+                (*dialogo.valores(), dialogo.modalidad_elegida(), categoria_id), "Ya existe esa categoría en esta liga.",
             )
 
     def borrar_categoria(self):

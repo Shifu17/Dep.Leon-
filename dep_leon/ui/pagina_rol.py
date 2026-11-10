@@ -59,7 +59,9 @@ class DialogoGenerar(QDialog):
         rejilla = QGridLayout()
         self.categorias = []
         for i, c in enumerate(categorias):
-            casilla = QCheckBox(f"{c['nombre']} ({c['equipos']} equipos)", checked=c["equipos"] >= 2)
+            casilla = QCheckBox(
+                f"{c['nombre']} ({c['equipos']} equipos · {c['modalidad']})", checked=c["equipos"] >= 2
+            )
             casilla.setEnabled(c["equipos"] >= 2)
             self.categorias.append((c["id"], casilla))
             rejilla.addWidget(casilla, i // 3, i % 3)
@@ -99,11 +101,14 @@ class DialogoGenerar(QDialog):
         forma.addRow("Un partido cada:", self.minutos)
 
         self.canchas = []
-        posibles = rol.canchas_de_modalidad(liga["modalidad"])
-        guardadas = guardada["canchas"] if guardada else posibles
+        # Las canchas que piden las modalidades de estas categorías: 1 y 2 para Fut 7 y 8; completa para 9 y 11.
+        pedidas = {c for categoria in categorias for c in rol.canchas_de_modalidad(categoria["modalidad"])}
+        posibles = [c for c in (*rol.CANCHAS_FUT_7, rol.CANCHA_FUT_11) if c in pedidas]
+        guardadas = [c for c in guardada["canchas"] if c in posibles] if guardada else posibles
+        guardadas = guardadas or posibles
         fila_canchas = QHBoxLayout()
         for cancha in posibles:
-            texto = "Terreno completo (Fut 11)" if cancha == rol.CANCHA_FUT_11 else f"Cancha {cancha}"
+            texto = "Cancha completa (Fut 9 y Fut 11)" if cancha == rol.CANCHA_FUT_11 else f"Cancha {cancha}"
             casilla = QCheckBox(texto, checked=cancha in guardadas)
             self.canchas.append((cancha, casilla))
             fila_canchas.addWidget(casilla)
@@ -175,14 +180,15 @@ class DialogoPartido(QDialog):
         self.hora = QTimeEdit(_a_qtime(rol.HORA_INICIO), displayFormat="HH:mm")
         self.minutos = QSpinBox(minimum=10, maximum=180, value=rol.MINUTOS_PARTIDO, suffix=" minutos")
         self.cancha = QComboBox()
-        for cancha in rol.canchas_de_modalidad(modalidad):
-            self.cancha.addItem(rol.nombre_cancha(cancha), cancha)
+        self.modalidad = QLabel(objectName="ayuda")
 
         self.categoria.currentIndexChanged.connect(self._cargar_equipos)
+        self.categoria.currentIndexChanged.connect(self._cargar_canchas)
         inicial = partido["categoria_id"] if partido else categoria_id
         if inicial is not None:
             self.categoria.setCurrentIndex(max(self.categoria.findData(inicial), 0))
         self._cargar_equipos()
+        self._cargar_canchas()
 
         if partido:
             self.categoria.setEnabled(False)
@@ -214,6 +220,7 @@ class DialogoPartido(QDialog):
         forma.addRow("Hora:", self.hora)
         forma.addRow("Duración:", self.minutos)
         forma.addRow("Cancha:", self.cancha)
+        forma.addRow("", self.modalidad)
         self.aviso = AvisoCampo()
         forma.addRow(self.aviso)
         forma.addRow(botones_dialogo(self, self._aceptar))
@@ -229,6 +236,16 @@ class DialogoPartido(QDialog):
                 control.addItem(f["nombre"], f["id"])
         if len(filas) > 1:
             self.visitante.setCurrentIndex(1)
+
+    def _cargar_canchas(self):
+        """Las canchas de la modalidad de la categoría: 1 o 2 en Fut 7 y 8; la completa en Fut 9 y 11."""
+        modalidad = rol.modalidad_de_categoria(self.conn, self.categoria.currentData())
+        actual = self.cancha.currentData()
+        self.cancha.clear()
+        for cancha in rol.canchas_de_modalidad(modalidad):
+            self.cancha.addItem(rol.lugar(cancha), cancha)
+        self.cancha.setCurrentIndex(max(0, self.cancha.findData(actual)))
+        self.modalidad.setText(f"Esta categoría juega {modalidad}.")
 
     def valores(self):
         return (
@@ -343,9 +360,11 @@ class PaginaRol(QWidget):
     def _categorias(self):
         return self.conn.execute(
             """SELECT c.id, c.nombre,
+                      CASE WHEN c.modalidad <> '' THEN c.modalidad ELSE l.modalidad END AS modalidad,
                       (SELECT COUNT(*) FROM equipos e
                        WHERE e.categoria_id = c.id AND e.torneo_id = ?) AS equipos
-               FROM categorias c WHERE c.liga_id = ? ORDER BY c.nombre COLLATE ES""",
+               FROM categorias c JOIN ligas l ON l.id = c.liga_id
+               WHERE c.liga_id = ? ORDER BY c.nombre COLLATE ES""",
             (self.torneo.currentData(), self.liga.currentData()),
         ).fetchall()
 

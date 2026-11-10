@@ -1,7 +1,8 @@
 """Generación del rol de juegos: enfrentamientos, horarios y control de empalmes.
 
-Todas las canchas están en el mismo terreno: Fut 7 usa la Cancha 1 y la Cancha 2, y un partido
-de Fut 11 ocupa el terreno completo, por lo que se empalma con cualquier otro partido.
+Todas las canchas están en el mismo terreno: Fut 7 y Fut 8 usan la Cancha 1 o la Cancha 2, y un
+partido de Fut 9 o de Fut 11 ocupa el terreno completo, por lo que se empalma con cualquier otro.
+Cada categoría puede tener su modalidad; si no la tiene, juega la de su liga.
 """
 
 import json
@@ -124,14 +125,37 @@ def nombre_jornada(jornada: int) -> str:
     return f"Jornada {jornada}"
 
 
+MODALIDADES = ["Fut 7", "Fut 8", "Fut 9", "Fut 11"]
+MODALIDADES_LIGA = ["Fut 7", "Fut 11"]  # la de toda la liga; cada categoría puede cambiarla
+
+
+def usa_terreno_completo(modalidad: str) -> bool:
+    return modalidad in ("Fut 9", "Fut 11")
+
+
 def nombre_cancha(cancha: str | None) -> str:
     if not cancha:
         return "-"
-    return "Fut 11" if cancha == CANCHA_FUT_11 else cancha
+    return "Completa" if cancha == CANCHA_FUT_11 else cancha
+
+
+def lugar(cancha: str | None) -> str:
+    """«Cancha 1» o «Cancha completa», para frases."""
+    return "Cancha completa" if cancha == CANCHA_FUT_11 else f"Cancha {cancha}"
 
 
 def canchas_de_modalidad(modalidad: str) -> list[str]:
-    return [CANCHA_FUT_11] if modalidad == "Fut 11" else list(CANCHAS_FUT_7)
+    return [CANCHA_FUT_11] if usa_terreno_completo(modalidad) else list(CANCHAS_FUT_7)
+
+
+def modalidad_de_categoria(conn: sqlite3.Connection, categoria_id: int) -> str:
+    """La modalidad con que juega la categoría: la suya o, si no tiene, la de su liga."""
+    fila = conn.execute(
+        """SELECT CASE WHEN c.modalidad <> '' THEN c.modalidad ELSE l.modalidad END AS modalidad
+           FROM categorias c JOIN ligas l ON l.id = c.liga_id WHERE c.id = ?""",
+        (categoria_id,),
+    ).fetchone()
+    return fila["modalidad"] if fila else "Fut 7"
 
 
 def a_minutos(hora: str) -> int:
@@ -255,6 +279,7 @@ def programar(
     horario: Horario,
     ocupados: list[Ocupado],
     disponibilidad: dict[int, dict[int, tuple[int, int]]] | None = None,
+    canchas_por_categoria: dict[int, tuple[str, ...]] | None = None,
 ) -> tuple[list[PartidoPlan], list[str]]:
     """Asigna fecha, hora y cancha. Cada jornada empieza en una semana nueva.
 
@@ -263,6 +288,11 @@ def programar(
     programarlo a mano. Devuelve los partidos y los avisos. Lanza ValueError si no caben.
     """
     disponibilidad = disponibilidad or {}
+    canchas_por_categoria = canchas_por_categoria or {}
+
+    def canchas_de(categoria: int) -> tuple[str, ...]:
+        return canchas_por_categoria.get(categoria, horario.canchas)
+
     if not horario.dias or not horario.canchas or horario.minutos <= 0:
         raise ValueError("Elige al menos un día y una cancha.")
     semana_modelo = date(2000, 1, 3)  # un lunes, sin restricción de fecha de inicio
@@ -318,7 +348,8 @@ def programar(
                 libres = [
                     (f, h, c)
                     for f, h, c in espacios
-                    if pueden(local, visitante, f.weekday(), h)
+                    if c in canchas_de(categoria)
+                    and pueden(local, visitante, f.weekday(), h)
                     and not any(
                         se_empalman(h, horario.minutos, c, o.hora, o.minutos, o.cancha)
                         for o in por_fecha.get(f, [])
@@ -417,8 +448,18 @@ def generar(
     if not jornadas:
         raise ValueError("Ninguna categoría elegida tiene al menos 2 equipos.")
 
+    canchas_por_categoria = {}
+    for categoria_id in jornadas:
+        modalidad = modalidad_de_categoria(conn, categoria_id)
+        canchas = tuple(c for c in canchas_de_modalidad(modalidad) if c in horario.canchas)
+        if not canchas:
+            nombre = conn.execute("SELECT nombre FROM categorias WHERE id = ?", (categoria_id,)).fetchone()["nombre"]
+            necesita = "la cancha completa" if usa_terreno_completo(modalidad) else "la Cancha 1 o la Cancha 2"
+            raise ValueError(f"La categoría {nombre} juega {modalidad} y necesita {necesita}. Márcala en «Canchas».")
+        canchas_por_categoria[categoria_id] = canchas
     plan, avisos_plan = programar(
-        jornadas, horario, _ocupados(conn, (torneo_id, list(jornadas))), disponibilidad_de_torneo(conn, torneo_id)
+        jornadas, horario, _ocupados(conn, (torneo_id, list(jornadas))), disponibilidad_de_torneo(conn, torneo_id),
+        canchas_por_categoria,
     )
     nombres_equipos = {
         e["id"]: e["nombre"]

@@ -27,7 +27,7 @@ tus datos se quedan en ella.
 
 | Área | Qué puedes hacer |
 |---|---|
-| **Ligas y categorías** | Administrar ligas por día, Fut 7 y Fut 11, categorías por año de nacimiento y torneos. |
+| **Ligas y categorías** | Administrar ligas por día, categorías por año de nacimiento y torneos. Cada categoría juega Fut 7, 8, 9 u 11, y el rol usa las canchas que le tocan. |
 | **Equipos y jugadores** | Importar de una vez las hojas de registro de Excel de los clubes, de todas las categorías, o registrar a mano, con foto, CURP y credenciales en PDF. |
 | **Pase de lista** | Sección propia para anotar quién vino, por equipo (columnas J1, J2… como la hoja de registro) o por partido, con la asistencia general y quién falta más. |
 | **Rol de juegos** | Generar jornadas, repartir partidos según la disponibilidad de cada equipo y evitar empalmes de cancha. |

@@ -33,6 +33,10 @@ VERDE_SUAVE = "#D3EADC"
 DORADO = "#C9A24B"
 DORADO_SUAVE = "#F5EBD3"
 DORADO_TEXTO = "#7A5A12"  # sobre DORADO_SUAVE: 5:1
+AZUL_SUAVE = "#E2EDF8"
+AZUL_TEXTO = "#1F4E79"  # sobre AZUL_SUAVE: más de 7:1
+MORADO_SUAVE = "#EEE6F6"
+MORADO_TEXTO = "#5B2C83"  # sobre MORADO_SUAVE: más de 7:1
 ESTRELLA = "#B8892A"  # dorado más firme: las estrellas se distinguen del fondo blanco (3:1)
 
 # Estados

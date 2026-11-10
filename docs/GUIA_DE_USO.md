@@ -53,6 +53,16 @@ Entra a **Ligas y categorías** y selecciona una liga:
 Las ligas aparecen en el orden de la semana, de lunes a domingo, y al abrir el programa se elige sola la
 liga que juega ese día. En las listas de liga, junto a cada nombre aparece su día.
 
+**Modalidad de cada categoría:** la liga dice si es Fut 7 o Fut 11, pero cada categoría puede jugar
+distinto. En las infantiles, por ejemplo, las chicas pueden ir en Fut 7, otras en Fut 8 y las grandes en
+Fut 9. Al agregar o editar la categoría elige **Se juega en**; si dejas «Igual que la liga», usa la de la
+liga. La columna **Juego** muestra la de cada una. Al generar el rol:
+
+- **Fut 7 y Fut 8** se juegan en la Cancha 1 o la Cancha 2 (pueden ir dos partidos a la vez).
+- **Fut 9 y Fut 11** ocupan la cancha completa: a esa hora no se juega nada más.
+
+En el rol y en los reportes, la cancha completa aparece como «Completa».
+
 Si dos categorías comparten años (por ejemplo «2011-2012» y «2012»), la tabla las marca con ⚠: un jugador
 cabría en las dos. Al guardar una categoría así, el programa te pregunta. Si escribes el nombre como
 «2009-10», queda como «2009-2010» y los años de nacimiento se llenan solos.

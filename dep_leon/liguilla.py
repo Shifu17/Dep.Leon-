@@ -337,7 +337,7 @@ def texto_llave(v: VistaLlave) -> str:
         return f"{v.ganador}\nPasa directo a la siguiente ronda"
     if v.fecha:
         dia = rol.DIAS[date.fromisoformat(v.fecha).weekday()][:3]
-        cuando = f"{dia} {date.fromisoformat(v.fecha):%d/%m} · {v.hora} · Cancha {rol.nombre_cancha(v.cancha)}"
+        cuando = f"{dia} {date.fromisoformat(v.fecha):%d/%m} · {v.hora} · {rol.lugar(v.cancha)}"
     elif v.partido_id:
         cuando = "Sin fecha"
     else:
