@@ -32,6 +32,7 @@ from .pagina_estadisticas import PaginaEstadisticas
 from .pagina_inicio import PaginaInicio
 from .pagina_ligas import PaginaLigas
 from .pagina_liguilla import PaginaLiguilla
+from .pagina_lista import PaginaPaseLista
 from .pagina_reportes import PaginaReportes
 from .pagina_resultados import VER_POR_CAPTURAR, PaginaResultados
 from .pagina_rol import PaginaRol
@@ -72,6 +73,7 @@ class Ventana(QMainWindow):
         self.equipos = PaginaEquipos(conn)
         self.rol = PaginaRol(conn)
         self.resultados = PaginaResultados(conn)
+        self.lista = PaginaPaseLista(conn)
         self.arbitros = PaginaArbitros(conn)
         self.estadisticas = PaginaEstadisticas(conn)
         self.liguilla = PaginaLiguilla(conn)
@@ -87,7 +89,10 @@ class Ventana(QMainWindow):
         self.config.buscar_actualizacion.connect(lambda: self.revisar_actualizacion(manual=True))
         self.config.cerrar_sesion.connect(self.cerrar_sesion)
         self.inicio.ir_a.connect(self._ir_a)
-        for pagina in (self.equipos, self.rol, self.resultados, self.estadisticas, self.liguilla, self.cobros, self.reportes):
+        for pagina in (
+            self.equipos, self.rol, self.resultados, self.lista, self.estadisticas, self.liguilla, self.cobros,
+            self.reportes,
+        ):
             pagina.filtros.elegido.connect(lambda p=pagina: self._recordar_seleccion(p))
 
         contenido = QWidget(objectName="contenido")
@@ -169,6 +174,7 @@ class Ventana(QMainWindow):
         agregar("Equipos y jugadores", self.equipos, "equipos")
         agregar("Rol de juegos", self.rol, "rol")
         agregar("Resultados", self.resultados, "resultados")
+        agregar("Pase de lista", self.lista, "asistencia")
         agregar("Árbitros", self.arbitros, "arbitros")
         agregar("Estadísticas", self.estadisticas, "estadisticas")
         agregar("Liguilla", self.liguilla, "liguilla")

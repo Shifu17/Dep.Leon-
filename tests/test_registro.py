@@ -278,7 +278,7 @@ def test_vista_previa_permite_cambiar_la_categoria(app, conn, torneo_id, tmp_pat
 
 
 def test_cuadricula_del_equipo_guarda_lo_marcado(app, conn, partido):
-    from dep_leon.ui.pagina_equipos import DialogoListaEquipo
+    from dep_leon.ui.lista import DialogoListaEquipo
 
     partido_id, pumas, _ = partido
     p1, p2 = _jugadores(conn, pumas)

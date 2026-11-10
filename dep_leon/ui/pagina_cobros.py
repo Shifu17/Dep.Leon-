@@ -25,7 +25,6 @@ from PySide6.QtWidgets import (
 from .. import cobros, recibos
 from . import diseno
 from .comun import (
-    ayuda_pagina,
     al_activar,
     fila_con_error,
     poner_vacio,
@@ -165,9 +164,6 @@ class PaginaCobros(QWidget):
 
         self.filtros = FiltrosLiga(conn, con_todas=True)
         self.filtros.cambiado.connect(self.refrescar)
-        fila_filtros = QHBoxLayout()
-        fila_filtros.addWidget(self.filtros, 1)
-        fila_filtros.addWidget(boton("Montos del torneo", self.editar_tarifas, "secundario"))
 
         self.cargado = Tarjeta("Total de cargos")
         self.cobrado = Tarjeta("Cobrado")
@@ -181,7 +177,8 @@ class PaginaCobros(QWidget):
         self.equipos = tabla(["Equipo", "Categoría", "Cargos", "Pagado", "Saldo"], estirar=0)
         self.equipos.itemSelectionChanged.connect(self.refrescar_detalle)
         self.busqueda = campo_busqueda(self.equipos, "Buscar equipo", ancho=128)
-        fila_filtros.insertWidget(1, self.busqueda)
+        self.busqueda.setMinimumWidth(0)
+        self.filtros.agregar("Buscar equipo", self.busqueda)
         al_activar(self.equipos, self.registrar_pago)
         encabezado_equipos = QHBoxLayout()
         encabezado_equipos.addWidget(QLabel("Adeudos por equipo", objectName="seccion"))
@@ -222,12 +219,13 @@ class PaginaCobros(QWidget):
 
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
-        raiz.addWidget(QLabel("Cobros", objectName="titulo"))
-        raiz.addWidget(ayuda_pagina(
+        raiz.addWidget(diseno.encabezado(
+            "Cobros",
             "Lo que debe cada equipo. Toca un equipo y pulsa «Registrar pago» cuando te paguen; "
-            "el recibo sale con «Recibo PDF»."
+            "el recibo sale con «Recibo PDF».",
+            [boton("Montos del torneo", self.editar_tarifas, "secundario", icono="cobros")],
         ))
-        raiz.addLayout(fila_filtros)
+        raiz.addWidget(self.filtros)
         raiz.addLayout(tarjetas)
         raiz.addLayout(columnas, 1)
         self.refrescar()

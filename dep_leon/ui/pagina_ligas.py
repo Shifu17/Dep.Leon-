@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import date
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -17,8 +17,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import rol
-from ..jugadores import rango_anios
+from .. import colores, rol
+from ..jugadores import anios_del_nombre, encimadas, nombre_categoria, rango_anios
 from . import campos, diseno
 from .chips import ESTADO_TORNEO, MODALIDAD, NEUTRO, chips_en, separar_dias
 from .comun import (
@@ -87,6 +87,7 @@ class DialogoCategoria(QDialog):
             if categoria["anio_max"] is not None:
                 self.anio_max.setValue(categoria["anio_max"])
         self.sin_limite.toggled.connect(self._actualizar)
+        self.nombre.editingFinished.connect(self._completar_desde_nombre)
         forma = QFormLayout(self)
         self.error_nombre = fila_con_error(forma, "Nombre:", self.nombre)
         forma.addRow(self.sin_limite)
@@ -94,6 +95,16 @@ class DialogoCategoria(QDialog):
         self.error_anios = fila_con_error(forma, "Nacidos hasta:", self.anio_max)
         forma.addRow(botones_dialogo(self, self._aceptar))
         self._actualizar()
+
+    def _completar_desde_nombre(self):
+        """«2009-10» queda como «2009-2010» y, si el nombre son años, se ponen solos abajo."""
+        nombre = nombre_categoria(self.nombre.text())
+        if nombre != self.nombre.text():
+            self.nombre.setText(nombre)
+        anios = anios_del_nombre(nombre)
+        if anios and not self.sin_limite.isChecked():
+            self.anio_min.setValue(anios[0])
+            self.anio_max.setValue(anios[1])
 
     def _actualizar(self):
         activo = not self.sin_limite.isChecked()
@@ -110,9 +121,10 @@ class DialogoCategoria(QDialog):
         self.accept()
 
     def valores(self):
+        nombre = nombre_categoria(self.nombre.text())
         if self.sin_limite.isChecked():
-            return self.nombre.text().strip(), None, None
-        return self.nombre.text().strip(), self.anio_min.value(), self.anio_max.value()
+            return nombre, None, None
+        return nombre, self.anio_min.value(), self.anio_max.value()
 
 
 class DialogoTorneo(QDialog):
@@ -222,13 +234,13 @@ class PaginaLigas(QWidget):
             self.tabla_ligas,
             [
                 (l["id"], [l["nombre"], l["modalidad"], l["dias"], l["categorias"], l["equipos"]])
-                for l in self.conn.execute(
+                for l in rol.ordenar_ligas(self.conn.execute(
                     """SELECT l.*,
                               (SELECT COUNT(*) FROM categorias c WHERE c.liga_id = l.id) AS categorias,
                               (SELECT COUNT(*) FROM equipos e JOIN torneos t ON t.id = e.torneo_id
                                WHERE t.liga_id = l.id) AS equipos
-                       FROM ligas l ORDER BY l.id"""
-                )
+                       FROM ligas l"""
+                ).fetchall())
             ],
         )
         self.refrescar_detalle()
@@ -240,15 +252,44 @@ class PaginaLigas(QWidget):
         self.titulo_torneos.setText(f"Torneos de {liga['nombre']}" if liga else "Torneos")
         categorias = self.conn.execute(
             "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre COLLATE ES", (liga_id,)
-        )
+        ).fetchall()
         llenar(
             self.tabla_categorias,
             [(c["id"], [c["nombre"], _rango(c)]) for c in categorias],
         )
+        self._marcar_encimadas(categorias)
         torneos = self.conn.execute(
             "SELECT * FROM torneos WHERE liga_id = ? ORDER BY nombre COLLATE ES", (liga_id,)
         )
         llenar(self.tabla_torneos, [(t["id"], [t["nombre"], rol.estado_torneo(self.conn, t["id"])]) for t in torneos])
+
+    def _marcar_encimadas(self, categorias):
+        """Un aviso en las categorías que comparten años: un jugador cabría en las dos."""
+        cruces = encimadas(categorias)
+        aviso = diseno.icono("aviso", colores.DORADO_TEXTO, 16)
+        for r in range(self.tabla_categorias.rowCount()):
+            celda = self.tabla_categorias.item(r, 1)
+            otras = cruces.get(self.tabla_categorias.item(r, 0).data(Qt.ItemDataRole.UserRole))
+            if otras:
+                celda.setIcon(aviso)
+                celda.setToolTip("Comparte años con " + ", ".join(otras) + ". Un jugador cabría en las dos.")
+
+    def _aviso_encimada(self, liga_id, nombre, anio_min, anio_max, sin_id=None) -> bool:
+        """Antes de guardar: si la categoría comparte años con otra, pregunta. True para seguir."""
+        if anio_min is None or anio_max is None:
+            return True
+        otras = [
+            c for c in self.conn.execute("SELECT * FROM categorias WHERE liga_id = ?", (liga_id,))
+            if c["id"] != sin_id
+        ]
+        cruces = encimadas([*otras, {"id": -1, "nombre": nombre, "anio_min": anio_min, "anio_max": anio_max}])
+        if -1 not in cruces:
+            return True
+        return confirmar(
+            self,
+            f"«{nombre}» comparte años con " + ", ".join(cruces[-1]) + ". Un jugador cabría en las dos "
+            "categorías.\n\n¿Guardarla de todos modos?",
+        )
 
     def _guardar(self, sql, parametros, duplicado) -> bool:
         try:
@@ -307,7 +348,7 @@ class PaginaLigas(QWidget):
         if liga_id is None:
             return
         dialogo = DialogoCategoria(self)
-        if dialogo.exec():
+        if dialogo.exec() and self._aviso_encimada(liga_id, *dialogo.valores()):
             self._guardar(
                 "INSERT INTO categorias (nombre, anio_min, anio_max, liga_id) VALUES (?, ?, ?, ?)",
                 (*dialogo.valores(), liga_id), "Ya existe esa categoría en esta liga.",
@@ -322,7 +363,7 @@ class PaginaLigas(QWidget):
             "SELECT * FROM categorias WHERE id = ?", (categoria_id,)
         ).fetchone()
         dialogo = DialogoCategoria(self, categoria)
-        if dialogo.exec():
+        if dialogo.exec() and self._aviso_encimada(categoria["liga_id"], *dialogo.valores(), sin_id=categoria_id):
             self._guardar(
                 "UPDATE categorias SET nombre = ?, anio_min = ?, anio_max = ? WHERE id = ?",
                 (*dialogo.valores(), categoria_id), "Ya existe esa categoría en esta liga.",

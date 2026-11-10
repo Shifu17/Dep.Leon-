@@ -110,3 +110,125 @@ def resumen_de_equipo(conn: sqlite3.Connection, equipo_id: int) -> tuple[dict[in
     asistencias = de_equipo(conn, equipo_id)
     con_lista = set().union(*asistencias.values()) if asistencias else set()
     return {j: len(p) for j, p in asistencias.items()}, len(con_lista)
+
+
+# --- Estadísticas generales -----------------------------------------------------------------------
+
+FALTAS_ALERTA = 3  # desde cuántas faltas conviene hablar con el equipo
+
+
+@dataclass
+class EquipoAsistencia:
+    equipo_id: int
+    nombre: str
+    categoria: str
+    jugadores: int
+    jugados: int  # partidos con resultado
+    con_lista: int  # partidos en que se pasó lista al equipo
+    asistencias: int
+
+    @property
+    def porcentaje(self) -> int | None:
+        posibles = self.jugadores * self.con_lista
+        return round(100 * self.asistencias / posibles) if posibles else None
+
+
+@dataclass
+class JugadorAsistencia:
+    jugador_id: int
+    nombre: str
+    equipo: str
+    asistencias: int
+    con_lista: int
+
+    @property
+    def faltas(self) -> int:
+        return self.con_lista - self.asistencias
+
+
+@dataclass
+class Estadisticas:
+    equipos: list[EquipoAsistencia]
+    jugadores: list[JugadorAsistencia]
+    partidos_jugados: int
+    partidos_con_lista: int
+
+    @property
+    def porcentaje(self) -> int | None:
+        posibles = sum(e.jugadores * e.con_lista for e in self.equipos)
+        return round(100 * sum(e.asistencias for e in self.equipos) / posibles) if posibles else None
+
+    @property
+    def perfectos(self) -> int:
+        """Jugadores que vinieron a todos los partidos con lista de su equipo."""
+        return sum(1 for j in self.jugadores if j.con_lista and not j.faltas)
+
+    @property
+    def con_muchas_faltas(self) -> list[JugadorAsistencia]:
+        return sorted(
+            (j for j in self.jugadores if j.faltas >= FALTAS_ALERTA), key=lambda j: (-j.faltas, j.nombre)
+        )
+
+
+def estadisticas(conn: sqlite3.Connection, torneo_id: int | None, categoria_id: int | None = None) -> Estadisticas:
+    """Asistencia de los equipos y jugadores del torneo (o de una categoría)."""
+    filtro = "e.torneo_id = ? AND (? IS NULL OR e.categoria_id = ?)"
+    parametros = (torneo_id, categoria_id, categoria_id)
+    con_lista = {
+        f["equipo_id"]: f["partidos"]
+        for f in conn.execute(
+            f"""SELECT j.equipo_id, COUNT(DISTINCT a.partido_id) AS partidos FROM asistencias a
+                JOIN jugadores j ON j.id = a.jugador_id JOIN equipos e ON e.id = j.equipo_id
+                WHERE {filtro} GROUP BY j.equipo_id""",
+            parametros,
+        )
+    }
+    equipos = [
+        EquipoAsistencia(
+            f["id"], f["nombre"], f["categoria"], f["jugadores"], f["jugados"], con_lista.get(f["id"], 0),
+            f["asistencias"],
+        )
+        for f in conn.execute(
+            f"""SELECT e.id, e.nombre, c.nombre AS categoria,
+                       (SELECT COUNT(*) FROM jugadores j WHERE j.equipo_id = e.id) AS jugadores,
+                       (SELECT COUNT(*) FROM partidos p WHERE (p.local_id = e.id OR p.visitante_id = e.id)
+                          AND p.estado IN (?, ?)) AS jugados,
+                       (SELECT COUNT(*) FROM asistencias a JOIN jugadores j ON j.id = a.jugador_id
+                          WHERE j.equipo_id = e.id) AS asistencias
+                FROM equipos e JOIN categorias c ON c.id = e.categoria_id
+                WHERE {filtro} ORDER BY c.nombre COLLATE ES, e.nombre COLLATE ES""",
+            (rol.JUGADO, rol.DEFAULT, *parametros),
+        )
+    ]
+    jugadores = [
+        JugadorAsistencia(f["id"], f["nombre"], f["equipo"], f["asistencias"], con_lista.get(f["equipo_id"], 0))
+        for f in conn.execute(
+            f"""SELECT j.id, j.nombre, j.equipo_id, e.nombre AS equipo,
+                       (SELECT COUNT(*) FROM asistencias a WHERE a.jugador_id = j.id) AS asistencias
+                FROM jugadores j JOIN equipos e ON e.id = j.equipo_id WHERE {filtro}""",
+            parametros,
+        )
+    ]
+    partidos = conn.execute(
+        f"""SELECT COUNT(DISTINCT CASE WHEN p.estado IN (?, ?) THEN p.id END) AS jugados,
+                   COUNT(DISTINCT a.partido_id) AS con_lista
+            FROM partidos p JOIN equipos e ON e.id = p.local_id
+            LEFT JOIN asistencias a ON a.partido_id = p.id
+            WHERE {filtro.replace('e.categoria_id', 'p.categoria_id')}""",
+        (rol.JUGADO, rol.DEFAULT, *parametros),
+    ).fetchone()
+    return Estadisticas(equipos, jugadores, partidos["jugados"], partidos["con_lista"])
+
+
+def partidos_para_lista(conn: sqlite3.Connection, torneo_id: int | None, categoria_id: int | None = None):
+    """Partidos a los que se puede pasar lista, del más reciente al más antiguo, con cuántos vinieron."""
+    return conn.execute(
+        """SELECT p.*, l.nombre AS local, v.nombre AS visitante, c.nombre AS categoria,
+                  (SELECT COUNT(*) FROM asistencias a WHERE a.partido_id = p.id) AS presentes
+           FROM partidos p JOIN equipos l ON l.id = p.local_id JOIN equipos v ON v.id = p.visitante_id
+           JOIN categorias c ON c.id = p.categoria_id
+           WHERE p.torneo_id = ? AND (? IS NULL OR p.categoria_id = ?) AND p.estado IN (?, ?, ?)
+             AND p.fecha IS NOT NULL
+           ORDER BY p.fecha DESC, p.hora, p.cancha""",
+        (torneo_id, categoria_id, categoria_id, *ESTADOS_CON_LISTA),
+    ).fetchall()

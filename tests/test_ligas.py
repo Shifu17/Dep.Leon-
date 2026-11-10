@@ -142,3 +142,67 @@ def test_torneos_de_un_anio_pasan_a_temporada(tmp_path):
         (ligas[0], "2026-2027"), (ligas[0], "Copa de Verano"), (ligas[1], "2026"), (ligas[1], "2026-2027"),
     ])
     conn.close()
+
+
+# --- Orden por día, liga de hoy y ayudas para las categorías -------------------------------------
+
+
+def test_ligas_en_el_orden_de_la_semana():
+    ligas = [{"id": 1, "dias": "Domingo"}, {"id": 2, "dias": "Viernes y sábado"}, {"id": 3, "dias": "Lunes"},
+             {"id": 4, "dias": ""}, {"id": 5, "dias": "miercoles"}]
+    assert [l["id"] for l in rol.ordenar_ligas(ligas)] == [3, 5, 2, 1, 4]
+    assert rol.liga_de_hoy(ligas, 5) == 2  # sábado
+    assert rol.liga_de_hoy(ligas, 1) is None  # martes: nadie juega
+    assert rol.detalle_de_liga("Libre Martes", "Martes") == ""  # el nombre ya lo dice
+    assert rol.detalle_de_liga("Infantil", "Viernes y sábado") == "Viernes y sábado"
+
+
+def test_los_filtros_abren_en_la_liga_de_hoy(app, conn, monkeypatch):
+    from datetime import date
+
+    from dep_leon.ui.controles import ROL_DETALLE
+    from dep_leon.ui.filtros import FiltrosLiga
+
+    femenil = conn.execute("SELECT id FROM ligas WHERE nombre = 'Femenil'").fetchone()[0]
+    infantil = conn.execute("SELECT id FROM ligas WHERE nombre = 'Infantil'").fetchone()[0]
+    with conn:
+        conn.execute("INSERT INTO torneos (liga_id, nombre) VALUES (?, '2026-2027')", (femenil,))
+        conn.execute("INSERT INTO torneos (liga_id, nombre) VALUES (?, '2026-2027')", (infantil,))
+    monkeypatch.setattr(rol, "hoy", lambda: date(2026, 11, 13))  # viernes
+    filtros = FiltrosLiga(conn, con_todas=True)
+    assert filtros.liga.currentText() == "Infantil"
+    assert filtros.liga.itemText(0) == "Femenil" and filtros.liga.itemData(0, ROL_DETALLE) == "Lunes"
+    filtros.deleteLater()
+
+
+def test_categorias_que_comparten_anios(pagina, conn, infantil_id, monkeypatch):
+    with conn:
+        conn.execute("INSERT INTO categorias (liga_id, nombre, anio_min, anio_max) VALUES (?, '2012', 2012, 2012)",
+                     (infantil_id,))
+    _elegir(pagina, "Infantil")
+    tabla = pagina.tabla_categorias
+    fila = next(r for r in range(tabla.rowCount()) if tabla.item(r, 0).text() == "2012")
+    assert "2011-2012 (2012)" in tabla.item(fila, 1).toolTip()
+    assert not tabla.item(fila, 1).icon().isNull()
+
+    preguntas = []
+    monkeypatch.setattr(ui_ligas, "confirmar", lambda _, m: preguntas.append(m) or False)
+
+    def llenar(dialogo):
+        dialogo.nombre.setText("2013-14")
+        dialogo._completar_desde_nombre()
+        return True
+
+    monkeypatch.setattr(ui_ligas.DialogoCategoria, "exec", llenar)
+    pagina.nueva_categoria()
+    assert preguntas and "comparte años con 2013-2014" in preguntas[0]
+    assert conn.execute("SELECT COUNT(*) FROM categorias WHERE nombre = '2013-2014'").fetchone()[0] == 1
+
+
+def test_nombre_de_categoria_y_anios(app):
+    dialogo = ui_ligas.DialogoCategoria(None)
+    dialogo.nombre.setText("2009-10")
+    dialogo._completar_desde_nombre()
+    assert dialogo.nombre.text() == "2009-2010"
+    assert (dialogo.anio_min.value(), dialogo.anio_max.value()) == (2009, 2010)
+    assert dialogo.valores() == ("2009-2010", 2009, 2010)

@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from .. import cobros, estadisticas, inicio, rol
 from . import diseno
+from .controles import ROL_DETALLE, con_detalle
 from .comun import boton, etiqueta, llenar, tabla
 
 
@@ -83,7 +84,7 @@ class PaginaInicio(QWidget):
 
         self.titulo = QLabel(objectName="titulo")
         self.titulo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        self.liga = QComboBox()
+        self.liga = con_detalle(QComboBox())
         self.liga.setMinimumWidth(200)
         self.liga.currentIndexChanged.connect(self.refrescar_datos)
         encabezado = QHBoxLayout()
@@ -199,8 +200,9 @@ class PaginaInicio(QWidget):
         self.liga.blockSignals(True)
         self.liga.clear()
         self.liga.addItem("Todas las ligas", None)
-        for l in self.conn.execute("SELECT id, nombre FROM ligas ORDER BY id"):
+        for l in rol.ordenar_ligas(self.conn.execute("SELECT id, nombre, dias FROM ligas").fetchall()):
             self.liga.addItem(l["nombre"], l["id"])
+            self.liga.setItemData(self.liga.count() - 1, rol.detalle_de_liga(l["nombre"], l["dias"]), ROL_DETALLE)
         self.liga.setCurrentIndex(max(self.liga.findData(actual), 0))
         self.liga.blockSignals(False)
         self.refrescar_datos()

@@ -50,6 +50,13 @@ Entra a **Ligas y categorías** y selecciona una liga:
   equipos. Cada torneo muestra su estado: **Próximo** (aún sin resultados), **Activo** (ya hay resultados y
   faltan partidos) o **Finalizado** (ya se jugaron todos).
 
+Las ligas aparecen en el orden de la semana, de lunes a domingo, y al abrir el programa se elige sola la
+liga que juega ese día. En las listas de liga, junto a cada nombre aparece su día.
+
+Si dos categorías comparten años (por ejemplo «2011-2012» y «2012»), la tabla las marca con ⚠: un jugador
+cabría en las dos. Al guardar una categoría así, el programa te pregunta. Si escribes el nombre como
+«2009-10», queda como «2009-2010» y los años de nacimiento se llenan solos.
+
 La tabla de ligas dice cuántas categorías y equipos tiene cada una. Debajo de Categorías y de Torneos está
 **Agregar**; para editar o eliminar, usa el botón **Más** o el clic derecho sobre la fila.
 
@@ -138,16 +145,28 @@ Cada vez que guardas algo, la barra verde de abajo lo confirma, por ejemplo «Li
 
 ### Pase de lista
 
-Cada jugador tiene la columna **Asist.** (asistencias; por ejemplo, «3 de 4»: vino a 3 de los 4 partidos en que se
-pasó lista). Hay tres formas de pasar lista:
+El pase de lista tiene su propia sección en el menú: **Pase de lista**. Arriba están las cifras generales
+del torneo (o de la categoría elegida):
 
-- **Por partido, en Resultados:** selecciona el partido y pulsa **Pase de lista**. Sirve para anotar quién
-  llegó antes de que termine el partido.
-- **Al capturar el resultado:** junto a los goles de cada jugador está la casilla **¿Quién vino?**. Quien
-  anota gol queda marcado solo.
-- **Por equipo, en Equipos y jugadores:** pulsa **Pase de lista**, junto a **Agregar jugador**. Verás
-  una cuadrícula como la de la hoja de registro: un renglón por jugador y una columna por partido (J1,
-  J2…). Haz clic en la celda para marcar «Sí» y otro clic para quitarlo.
+- **Asistencia general:** qué porcentaje de los jugadores vino a los partidos en que se pasó lista.
+- **Partidos con lista:** en cuántos de los partidos jugados ya se pasó lista.
+- **Asistencia perfecta:** cuántos jugadores no han faltado.
+- **Con 3 faltas o más:** cuántos jugadores conviene revisar con su equipo; aparecen en la lista
+  **Jugadores que más faltan**.
+
+Un partido sin lista no cuenta como falta. En **Pasar lista** eliges cómo trabajar:
+
+- **Por equipo:** toca un equipo y marca su cuadrícula, como la de la hoja de registro: un renglón por
+  jugador y una columna por partido (J1, J2…). Clic en la celda para marcar «Sí» y otro clic para quitarlo;
+  después pulsa **Guardar lista**. Si cambias de equipo sin guardar, el programa te pregunta.
+- **Por partido:** elige el partido y pulsa **Pasar lista del partido** (o doble clic). Sirve para anotar
+  quién llegó antes de que termine.
+
+También se marca al **capturar el resultado**: junto a los goles de cada jugador está la casilla **¿Quién
+vino?**, y quien anota gol queda marcado solo. En **Equipos y jugadores**, la columna **Asist.** dice cuántas
+veces vino cada jugador (por ejemplo «3 de 4»).
+
+![Pase de lista con la asistencia general, los equipos y la cuadrícula](img/asistencia.png)
 
 ### Otras acciones del equipo
 
@@ -307,7 +326,7 @@ crea un respaldo automático. Sin internet no ocurre nada y todo sigue funcionan
 
 ## 11. Atajos y búsqueda
 
-La liga, el torneo y la categoría que eliges se conservan al cambiar de pantalla. Inicio tiene su propia
+Arriba de cada pantalla, los filtros (liga, torneo, categoría…) van juntos en una tarjeta, cada uno con su nombre arriba. La liga, el torneo y la categoría que eliges se conservan al cambiar de pantalla. Inicio tiene su propia
 vista.
 
 Pulsa el encabezado de una columna para ordenar la tabla, y vuelve a pulsarlo para invertir el orden. En

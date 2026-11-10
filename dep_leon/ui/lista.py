@@ -1,8 +1,9 @@
-"""Pase de lista de un partido: una columna por equipo con una casilla por jugador."""
+"""Pase de lista: por partido (una columna por equipo) o por equipo (cuadrícula J1, J2...)."""
 
 import sqlite3
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -12,12 +13,14 @@ from PySide6.QtWidgets import (
     QLabel,
     QScrollArea,
     QSpinBox,
+    QAbstractItemView,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-from .. import asistencia
-from .comun import AvisoCampo, boton, botones_dialogo, error
+from .. import asistencia, colores
+from .comun import AvisoCampo, boton, botones_dialogo, error, tabla
 
 GOLES_MAXIMOS = 99
 
@@ -156,3 +159,130 @@ def pasar_lista(padre: QWidget, conn: sqlite3.Connection, partido) -> bool:
         error(padre, "Este partido está pospuesto o sin programar; todavía no se puede pasar lista.")
         return False
     return bool(DialogoPaseLista(padre, conn, partido).exec())
+
+
+class CuadriculaLista(QWidget):
+    """Pase de lista de un equipo en todos sus partidos, como las columnas J1, J2... de la hoja de registro.
+
+    Basta un clic en la celda (o la barra espaciadora) para marcar o desmarcar: es más fácil de atinar
+    que una casilla pequeña.
+    """
+
+    ANCHO_PARTIDO = 64
+    MARCA = "Sí"  # texto, no un símbolo: se lee igual con cualquier fuente
+    cambiada = Signal()
+
+    def __init__(self, conn, equipo_id: int, padre=None):
+        super().__init__(padre)
+        self.conn = conn
+        self.equipo_id = equipo_id
+        self.modificada = False
+        self.partidos = asistencia.partidos_de_equipo(conn, equipo_id)
+        asistio = asistencia.de_equipo(conn, equipo_id)
+        self.jugadores = conn.execute(
+            "SELECT * FROM jugadores WHERE equipo_id = ? ORDER BY numero IS NULL, numero, nombre COLLATE ES",
+            (equipo_id,),
+        ).fetchall()
+
+        self.rejilla = tabla(["Jugador", *[p.etiqueta for p in self.partidos], "Total"], estirar=0, ordenable=False)
+        self.rejilla.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.rejilla.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        cabecera = self.rejilla.horizontalHeader()
+        for c, p in enumerate(self.partidos, start=1):
+            self.rejilla.horizontalHeaderItem(c).setToolTip(p.descripcion)
+            cabecera.setSectionResizeMode(c, cabecera.ResizeMode.Fixed)
+            self.rejilla.setColumnWidth(c, max(self.ANCHO_PARTIDO, cabecera.sectionSizeHint(c)))
+        self.rejilla.setRowCount(len(self.jugadores))
+        for r, j in enumerate(self.jugadores):
+            celda = QTableWidgetItem(_nombre_con_numero(j))
+            celda.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            self.rejilla.setItem(r, 0, celda)
+            for c, p in enumerate(self.partidos, start=1):
+                casilla = QTableWidgetItem()
+                casilla.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                casilla.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                casilla.setToolTip(f"{j['nombre']}: {p.descripcion}")
+                self.rejilla.setItem(r, c, casilla)
+                self._poner(r, c, p.id in asistio.get(j["id"], set()))
+            total = QTableWidgetItem()
+            total.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            total.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.rejilla.setItem(r, len(self.partidos) + 1, total)
+            self._contar(r)
+        self.rejilla.cellClicked.connect(self.alternar)
+        if self.jugadores and self.partidos:
+            self.rejilla.setCurrentCell(0, 1)  # el teclado empieza en el primer partido, no en el nombre
+        espacio = QShortcut(QKeySequence(Qt.Key.Key_Space), self.rejilla)
+        espacio.setContext(Qt.ShortcutContext.WidgetShortcut)
+        espacio.activated.connect(lambda: self.alternar(self.rejilla.currentRow(), self.rejilla.currentColumn()))
+        columna = QVBoxLayout(self)
+        columna.setContentsMargins(0, 0, 0, 0)
+        columna.addWidget(self.rejilla)
+
+    def marcado(self, fila: int, columna: int) -> bool:
+        return bool(self.rejilla.item(fila, columna).data(Qt.ItemDataRole.UserRole))
+
+    def _poner(self, fila: int, columna: int, valor: bool):
+        celda = self.rejilla.item(fila, columna)
+        celda.setData(Qt.ItemDataRole.UserRole, valor)
+        celda.setText(self.MARCA if valor else "")
+        celda.setBackground(QColor(colores.VERDE_SUAVE) if valor else QColor(0, 0, 0, 0))
+        celda.setForeground(QColor(colores.VERDE_ACTIVO))
+        fuente = self.rejilla.font()
+        fuente.setBold(True)
+        celda.setFont(fuente)
+        celda.setData(Qt.ItemDataRole.AccessibleTextRole, "vino" if valor else "no vino")
+
+    def alternar(self, fila: int, columna: int):
+        if fila < 0 or not 1 <= columna <= len(self.partidos):
+            return
+        self._poner(fila, columna, not self.marcado(fila, columna))
+        self._contar(fila)
+        self.modificada = True
+        self.cambiada.emit()
+
+    def _contar(self, fila: int):
+        vino = sum(self.marcado(fila, c) for c in range(1, len(self.partidos) + 1))
+        self.rejilla.item(fila, len(self.partidos) + 1).setText(str(vino))
+
+    def guardar(self) -> None:
+        """Lanza ValueError si algo no cuadra."""
+        marcas = {p.id: set() for p in self.partidos}
+        for r, j in enumerate(self.jugadores):
+            for c, p in enumerate(self.partidos, start=1):
+                if self.marcado(r, c):
+                    marcas[p.id].add(j["id"])
+        asistencia.guardar_de_equipo(self.conn, self.equipo_id, marcas)
+        self.modificada = False
+
+
+class DialogoListaEquipo(QDialog):
+    """La cuadrícula del equipo en una ventana aparte."""
+
+    def __init__(self, padre, conn, equipo_id: int, nombre: str):
+        super().__init__(padre)
+        self.setWindowTitle(f"Pase de lista: {nombre}")
+        self.resize(980, 600)
+        self.cuadricula = CuadriculaLista(conn, equipo_id)
+        self.rejilla = self.cuadricula.rejilla
+        self.marcado = self.cuadricula.marcado
+        self.alternar = self.cuadricula.alternar
+        raiz = QVBoxLayout(self)
+        raiz.addWidget(QLabel(nombre, objectName="seccion"))
+        raiz.addWidget(QLabel(AYUDA_CUADRICULA, objectName="ayuda", wordWrap=True))
+        raiz.addWidget(self.cuadricula, 1)
+        raiz.addWidget(botones_dialogo(self, self._aceptar, "Guardar lista"))
+
+    def _aceptar(self):
+        try:
+            self.cuadricula.guardar()
+        except ValueError as exc:
+            error(self, str(exc))
+            return
+        self.accept()
+
+
+AYUDA_CUADRICULA = (
+    "Haz clic en la celda del partido al que vino cada jugador; otro clic la desmarca. "
+    "Pasa el mouse por el encabezado para ver la fecha y el rival de cada partido."
+)

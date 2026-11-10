@@ -31,13 +31,13 @@ from .comun import (
     campo_busqueda,
     confirmar,
     error,
-    etiqueta,
     id_seleccionado,
     info,
     llenar,
     poner_vacio,
     tabla,
 )
+from .controles import SelectorFecha
 from .filtros import FiltrosLiga
 
 
@@ -298,10 +298,9 @@ class PaginaRol(QWidget):
         self.filtros.cambiado.connect(self._al_cambiar_torneo)
         self.fecha.currentIndexChanged.connect(self.refrescar_partidos)
 
-        filtros = QHBoxLayout()
-        filtros.addWidget(self.filtros, 4)
-        filtros.addWidget(etiqueta("Fecha:", self.fecha))
-        filtros.addWidget(self.fecha, 1)
+        self.selector_fecha = SelectorFecha(self.fecha)
+        self.filtros.agregar("Fecha", self.selector_fecha, 1)
+        self.fecha.setAccessibleName("Fecha")
 
         self.tabla = tabla(
             ["Fecha", "Hora", "Equipo", "Equipo", "Categoría", "Cancha", "Fase", "Estado", "Árbitro"], estirar=2
@@ -332,7 +331,7 @@ class PaginaRol(QWidget):
         raiz.addWidget(ayuda_pagina(
             "Aquí están todos los partidos. «Generar rol» los acomoda solo por fecha y cancha; con «Agregar partido» pones uno a mano."
         ))
-        raiz.addLayout(filtros)
+        raiz.addWidget(self.filtros)
         raiz.addLayout(acciones)
         raiz.addWidget(self.tabla, 1)
         raiz.addWidget(self.descansan)

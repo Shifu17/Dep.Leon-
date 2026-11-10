@@ -1,22 +1,29 @@
-"""Fila de filtros de liga, torneo y categoría para las páginas de resultados y estadísticas."""
+"""Tarjeta de filtros: liga, torneo, categoría y los filtros propios de cada pantalla.
+
+Cada lista lleva su nombre arriba, en letra chica, y todas comparten el ancho; así la fila se lee como
+columnas ordenadas y no como un renglón amontonado de etiquetas y listas.
+"""
 
 import sqlite3
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from .comun import etiqueta
+from .. import rol
+from . import diseno
+from .controles import ROL_DETALLE, ajustar_combo, con_detalle
 
 
-class FiltrosLiga(QWidget):
+class FiltrosLiga(QFrame):
     cambiado = Signal()
     elegido = Signal()  # solo cuando la persona cambia una lista, no al refrescar
 
     def __init__(self, conn: sqlite3.Connection, con_todas: bool):
-        super().__init__()
+        super().__init__(objectName="filtros")
+        diseno.sombra(self)
         self.conn = conn
         self.con_todas = con_todas
-        self.liga = QComboBox()
+        self.liga = con_detalle(QComboBox())
         self.torneo = QComboBox()
         self.categoria = QComboBox()
         self.liga.currentIndexChanged.connect(self._al_cambiar_liga)
@@ -26,12 +33,34 @@ class FiltrosLiga(QWidget):
         self.categoria.activated.connect(self._marcar_eleccion)
         for control in (self.liga, self.torneo, self.categoria):
             control.activated.connect(self.elegido)
-        fila = QHBoxLayout(self)
-        fila.setContentsMargins(0, 0, 0, 0)
-        for texto, control in (("Liga:", self.liga), ("Torneo:", self.torneo), ("Categoría:", self.categoria)):
-            fila.addWidget(etiqueta(texto, control))
-            fila.addWidget(control, 1)
+        self._fila = QHBoxLayout(self)
+        self._fila.setContentsMargins(14, 10, 14, 12)
+        self._fila.setSpacing(14)
+        for texto, control in (("Liga", self.liga), ("Torneo", self.torneo), ("Categoría", self.categoria)):
+            self.agregar(texto, control)
         self.refrescar()
+
+    def agregar(self, titulo: str, control: QWidget, estirar: int = 1, primero: bool = False) -> QWidget:
+        """Agrega otro filtro a la tarjeta, con su nombre arriba. Devuelve la columna para ocultarla.
+
+        Con `primero`, va antes de la liga: para lo que más se elige en esa pantalla.
+        """
+        columna = QWidget(objectName="columnaFiltro")
+        caja = QVBoxLayout(columna)
+        caja.setContentsMargins(0, 0, 0, 0)
+        caja.setSpacing(4)
+        nombre = QLabel(titulo, objectName="filtroTitulo")
+        caja.addWidget(nombre)
+        caja.addWidget(control)
+        if isinstance(control, QComboBox):
+            ajustar_combo(control)
+            nombre.setBuddy(control)
+            control.setAccessibleName(titulo)
+        if primero:
+            self._fila.insertWidget(0, columna, estirar)
+        else:
+            self._fila.addWidget(columna, estirar)
+        return columna
 
     def _marcar_eleccion(self):
         self._categoria_elegida = True
@@ -48,15 +77,21 @@ class FiltrosLiga(QWidget):
         actual = self.liga.currentData()
         self.liga.blockSignals(True)
         self.liga.clear()
-        for l in self.conn.execute("SELECT id, nombre FROM ligas ORDER BY id"):
+        ligas = rol.ordenar_ligas(self.conn.execute("SELECT id, nombre, dias FROM ligas").fetchall())
+        for l in ligas:
             self.liga.addItem(l["nombre"], l["id"])
+            self.liga.setItemData(self.liga.count() - 1, rol.detalle_de_liga(l["nombre"], l["dias"]), ROL_DETALLE)
         indice = self.liga.findData(actual)
         if indice < 0:
-            # Empieza en la primera liga que ya tiene torneos; si no hay, en la primera con categorías.
+            # Empieza en la liga que juega hoy, si ya tiene torneo; si no, en la primera que tenga
+            # torneos y, si no hay, en la primera con categorías.
+            con_torneo = {f[0] for f in self.conn.execute("SELECT liga_id FROM torneos")}
+            hoy = rol.liga_de_hoy([l for l in ligas if l["id"] in con_torneo], rol.hoy().weekday())
             fila = self.conn.execute(
                 "SELECT liga_id FROM torneos UNION ALL SELECT liga_id FROM categorias LIMIT 1"
             ).fetchone()
-            indice = self.liga.findData(fila["liga_id"]) if fila else 0
+            elegida = hoy if hoy is not None else fila["liga_id"] if fila else None
+            indice = self.liga.findData(elegida) if elegida is not None else 0
         self.liga.setCurrentIndex(max(indice, 0))
         self.liga.blockSignals(False)
         self._al_cambiar_liga()

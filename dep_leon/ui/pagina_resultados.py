@@ -35,8 +35,9 @@ from .comun import (
     tabla,
 )
 from .estrellas import NotaEquipo
+from .controles import Segmentado
 from .filtros import FiltrosLiga
-from .lista import ColumnaEquipo, pasar_lista
+from .lista import ColumnaEquipo
 from .tema import ROJO
 
 GOLES_MAXIMOS = 99
@@ -298,18 +299,13 @@ class PaginaResultados(QWidget):
 
         self.filtros = FiltrosLiga(conn, con_todas=True)
         self.filtros.cambiado.connect(self.refrescar_partidos)
-        self.ver = QComboBox()
-        self.ver.addItems([VER_POR_CAPTURAR, VER_CAPTURADOS, VER_TODOS])
+        self.ver = Segmentado([VER_POR_CAPTURAR, VER_CAPTURADOS, VER_TODOS], "Ver")
         self.ver.currentIndexChanged.connect(self.refrescar_partidos)
-        filtros = QHBoxLayout()
-        filtros.addWidget(self.filtros, 4)
-        filtros.addWidget(etiqueta("Ver:", self.ver))
-        filtros.addWidget(self.ver, 1)
+        self.filtros.agregar("Ver", self.ver, 0)
 
         acciones = diseno.FilaBotones()
         for texto, accion, estilo, ayuda in (
             ("Capturar resultado", self.capturar, None, "Anota el marcador, quién vino y quién anotó."),
-            ("Pase de lista", self.pase_de_lista, "secundario", "Anota quién llegó, aunque el partido no termine."),
             ("No se presentó", self.no_se_presento, "secundario", "Da el partido por default o lo pospone."),
             ("Borrar resultado", self.borrar, "peligro", "Regresa el partido a «por jugar»."),
         ):
@@ -334,9 +330,10 @@ class PaginaResultados(QWidget):
         raiz.setContentsMargins(0, 0, 0, 0)
         raiz.addWidget(QLabel("Resultados", objectName="titulo"))
         raiz.addWidget(ayuda_pagina(
-            "Toca un partido y pulsa «Capturar resultado» para anotar el marcador, los goles y quién vino. Con «Pase de lista» anotas la asistencia antes de que termine el partido."
+            "Toca un partido y pulsa «Capturar resultado» para anotar el marcador, los goles y quién vino. "
+            "Para pasar lista antes de que termine el partido, ve a «Pase de lista»."
         ))
-        raiz.addLayout(filtros)
+        raiz.addWidget(self.filtros)
         raiz.addLayout(acciones)
         raiz.addWidget(self.vacio)
         raiz.addWidget(self.tabla, 1)
@@ -402,11 +399,6 @@ class PaginaResultados(QWidget):
         if partido is not None and capturar_partido(self, self.conn, partido):
             self.refrescar_partidos()
             listo(self, "resultado guardado.")
-
-    def pase_de_lista(self):
-        partido = self._partido()
-        if partido is not None and pasar_lista(self, self.conn, _partido_completo(self.conn, partido)):
-            listo(self, "pase de lista guardado.")
 
     def no_se_presento(self):
         partido = self._partido()

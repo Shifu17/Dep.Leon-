@@ -206,10 +206,34 @@ QDoubleSpinBox::up-button:hover, QSpinBox::up-button:hover, QTimeEdit::up-button
 QDoubleSpinBox::down-button:hover, QSpinBox::down-button:hover, QTimeEdit::down-button:hover {{ background: {VERDE_SUAVE}; }}
 QDoubleSpinBox::up-arrow, QSpinBox::up-arrow, QTimeEdit::up-arrow {{ image: url("{FLECHA_ARRIBA}"); width: 9px; height: 6px; }}
 QDoubleSpinBox::down-arrow, QSpinBox::down-arrow, QTimeEdit::down-arrow {{ image: url("{FLECHA}"); width: 9px; height: 6px; }}
+QComboBox {{ combobox-popup: 0; padding-left: 10px; min-height: 22px; }}
+QComboBox:focus {{ padding-left: 9px; }}
+QComboBox:hover {{ border-color: {VERDE}; }}
+QComboBox:disabled {{ background: {CAMPO_DESACTIVADO}; color: {TEXTO_CAMPO_DESACTIVADO}; }}
 QComboBox QAbstractItemView {{
-    background: {BLANCO}; color: {TEXTO};
-    selection-background-color: {VERDE_SUAVE}; selection-color: {TEXTO};
+    background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE}; border-radius: 8px; padding: 4px;
+    outline: 0; selection-background-color: {VERDE_SUAVE}; selection-color: {TEXTO};
 }}
+QComboBox QAbstractItemView::item {{ min-height: 30px; padding: 0 10px; border-radius: 6px; }}
+QComboBox QAbstractItemView::item:hover {{ background: {FILA_ALTERNA}; }}
+QComboBox QAbstractItemView::item:selected {{ background: {VERDE_SUAVE}; color: {TEXTO}; }}
+QFrame#filtros {{ background: {BLANCO}; border: 1px solid {CUADRICULA}; border-radius: 10px; }}
+QWidget#columnaFiltro {{ background: transparent; }}
+QLabel#filtroTitulo {{ color: {TEXTO_SUAVE}; font-size: {_t(12)}; font-weight: 600; background: transparent; }}
+QPushButton#segmento {{
+    background: {BLANCO}; color: {TEXTO_SUAVE}; border: 1px solid {BORDE_CONTROL}; border-radius: 0;
+    padding: 6px 14px; min-height: 22px; font-weight: 600;
+}}
+QPushButton#segmento[posicion="inicio"] {{ border-top-left-radius: 8px; border-bottom-left-radius: 8px; }}
+QPushButton#segmento[posicion="fin"] {{
+    border-top-right-radius: 8px; border-bottom-right-radius: 8px; border-left: none;
+}}
+QPushButton#segmento[posicion="medio"] {{ border-left: none; }}
+QPushButton#segmento[posicion="solo"] {{ border-radius: 8px; }}
+QPushButton#segmento:hover {{ background: {FILA_ALTERNA}; color: {TEXTO}; }}
+QPushButton#segmento:checked {{ background: {VERDE_SUAVE}; color: {VERDE_ACTIVO}; }}
+QPushButton#segmento:focus {{ background: {FILA_ALTERNA}; color: {TEXTO}; text-decoration: underline; }}
+QPushButton#segmento:checked:focus {{ background: {VERDE_SUAVE}; color: {VERDE_ACTIVO}; }}
 QStatusBar {{ background: {VERDE_SUAVE}; color: {TEXTO}; font-weight: 600; min-height: 28px; }}
 QStatusBar QLabel {{ background: transparent; }}
 QToolTip {{ background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE}; }}

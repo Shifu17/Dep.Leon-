@@ -70,6 +70,32 @@ def nombre_torneo(texto: str) -> str:
     return f"{inicio}-{fin}"
 
 
+def _sin_acentos(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", texto.casefold()) if not unicodedata.combining(c))
+
+
+def dias_de_liga(texto: str) -> list[int]:
+    """«Viernes y sábado» -> [4, 5] (0 es lunes). Lee los nombres de los días, con o sin acento."""
+    plano = _sin_acentos(texto)
+    return [i for i, dia in enumerate(DIAS) if re.search(rf"\b{_sin_acentos(dia)}\b", plano)]
+
+
+def detalle_de_liga(nombre: str, dias: str) -> str:
+    """Los días para mostrar junto al nombre, salvo que el nombre ya los diga («Libre Martes»)."""
+    ya_dice = set(dias_de_liga(nombre))
+    return "" if ya_dice and set(dias_de_liga(dias)) <= ya_dice else dias
+
+
+def ordenar_ligas(ligas) -> list:
+    """Las ligas en el orden de la semana; las que no dicen su día van al final."""
+    return sorted(ligas, key=lambda l: (min(dias_de_liga(l["dias"]), default=7), l["id"]))
+
+
+def liga_de_hoy(ligas, dia: int) -> int | None:
+    """La liga que juega ese día de la semana (0 es lunes), si hay una."""
+    return next((l["id"] for l in ordenar_ligas(ligas) if dia in dias_de_liga(l["dias"])), None)
+
+
 TORNEO_PROXIMO = "Próximo"
 TORNEO_ACTIVO = "Activo"
 TORNEO_FINALIZADO = "Finalizado"

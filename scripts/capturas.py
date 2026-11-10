@@ -171,6 +171,7 @@ def main():
 
     capturar("Equipos y jugadores", "equipos.png", equipo_con_lista)
     capturar("Árbitros", "arbitros.png")
+    capturar("Pase de lista", "asistencia.png", lambda: elegir_categoria(ventana.lista.filtros, "2015-2016"))
 
     from dep_leon.ui import pagina_resultados as ui_resultados  # noqa: E402
 
@@ -181,7 +182,7 @@ def main():
     app.processEvents()
     captura.grab().save(str(DESTINO / "calificar_arbitro.png"))
     captura.close()
-    from dep_leon.ui.pagina_equipos import DialogoListaEquipo  # noqa: E402
+    from dep_leon.ui.lista import DialogoListaEquipo  # noqa: E402
 
     aguilas_infantil = conn.execute(
         "SELECT id FROM equipos WHERE nombre = 'Águilas' AND categoria_id = ?", (categorias[0],)

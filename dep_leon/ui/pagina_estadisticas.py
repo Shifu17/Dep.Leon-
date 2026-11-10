@@ -16,7 +16,8 @@ from PySide6.QtWidgets import (
 )
 
 from .. import estadisticas, resultados
-from .comun import ayuda_pagina, boton, botones_dialogo, error, llenar, poner_vacio, tabla
+from . import diseno
+from .comun import boton, botones_dialogo, error, llenar, poner_vacio, tabla
 from .filtros import FiltrosLiga
 
 
@@ -63,9 +64,6 @@ class PaginaEstadisticas(QWidget):
 
         self.filtros = FiltrosLiga(conn, con_todas=False)
         self.filtros.cambiado.connect(self.refrescar_tablas)
-        fila_filtros = QHBoxLayout()
-        fila_filtros.addWidget(self.filtros, 1)
-        fila_filtros.addWidget(boton("Reglas de puntos", self.editar_reglas, "secundario"))
 
         self.clasificacion = _solo_lectura(
             ["Pos.", "Equipo", "PJ", "PG", "PE", "PP", "GF", "GC", "DG", "Pts"], estirar=1
@@ -95,11 +93,12 @@ class PaginaEstadisticas(QWidget):
 
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
-        raiz.addWidget(QLabel("Estadísticas", objectName="titulo"))
-        raiz.addWidget(ayuda_pagina(
-            "Posiciones, goleadores y portería menos goleada. Se calculan solas con los resultados que captures."
+        raiz.addWidget(diseno.encabezado(
+            "Estadísticas",
+            "Posiciones, goleadores y portería menos goleada. Se calculan solas con los resultados que captures.",
+            [boton("Reglas de puntos", self.editar_reglas, "secundario", icono="configuracion")],
         ))
-        raiz.addLayout(fila_filtros)
+        raiz.addWidget(self.filtros)
         raiz.addLayout(columnas, 1)
         raiz.addWidget(self.leyenda)
         self.refrescar_tablas()

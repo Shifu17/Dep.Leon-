@@ -111,7 +111,7 @@ def test_equipos_deja_a_la_vista_lo_frecuente(ventana, app):
     textos = [b.text() for b in botones]
     assert len(botones) <= 10, textos
     assert sum(b.objectName() == "" for b in botones) <= 2  # solo los dos «Agregar» son principales
-    for visible in ("Agregar jugador", "Pase de lista", "Acciones"):
+    for visible in ("Agregar jugador", "Acciones"):
         assert visible in textos, textos
     menus = {b.text(): [a.text() for a in b.menu().actions()] for b in botones if b.menu()}
     # Excel y credenciales, juntos en «Acciones»

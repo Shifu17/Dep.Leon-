@@ -20,7 +20,8 @@ from PySide6.QtWidgets import (
 
 from .. import lienzo, reportes
 from . import diseno
-from .comun import ayuda_pagina, boton, error, etiqueta, info
+from .comun import ayuda_pagina, boton, error, info
+from .controles import SelectorFecha
 from .filtros import FiltrosLiga
 
 ROL = "Rol de juegos"
@@ -46,18 +47,15 @@ class PaginaReportes(QWidget):
         self.reporte.currentIndexChanged.connect(self._al_cambiar_filtros)
         self.fecha = QComboBox()
         self.fecha.currentIndexChanged.connect(self.actualizar_vista)
-        self.etiqueta_fecha = etiqueta("Fecha:", self.fecha)
+        self.filtros.agregar("Reporte", self.reporte, primero=True)
+        self.etiqueta_fecha = self.filtros.agregar("Fecha", SelectorFecha(self.fecha))
+        self.fecha.setAccessibleName("Fecha")
 
         self.boton_pdf = boton("Guardar PDF", self.guardar_pdf)
         self.boton_imagen = boton("Guardar imagen", self.guardar_imagen, "secundario")
         self.boton_copiar: QPushButton = boton("Copiar imagen", self.copiar_imagen, "secundario")
 
         fila = diseno.FilaBotones()
-        fila.addWidget(etiqueta("Reporte:", self.reporte))
-        fila.addWidget(self.reporte)
-        fila.addWidget(self.etiqueta_fecha)
-        fila.addWidget(self.fecha)
-        fila.addStretch(1)
         fila.addWidget(self.boton_pdf)
         fila.addWidget(self.boton_imagen)
         fila.addWidget(self.boton_copiar)

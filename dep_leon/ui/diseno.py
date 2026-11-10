@@ -50,6 +50,9 @@ ICONOS = {
     "persona": "",
     "arbitros": "",
     "opciones": "",
+    "asistencia": "",
+    "atras": "",
+    "adelante": "",
 }
 
 # El icono de un botón se elige por la primera palabra de su texto: así todos los botones que hacen
