@@ -1,18 +1,17 @@
-"""Calificación con estrellas y la foto redonda de una persona.
+"""Calificación con estrellas.
 
 Las estrellas se dibujan, no se escriben con una fuente: así se ven iguales en cualquier
 computadora. El número siempre acompaña a las estrellas para no depender solo del color.
 """
 
 import math
-from pathlib import Path
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QPixmap, QPolygonF
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QWidget
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap, QPolygonF
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QSizePolicy, QVBoxLayout, QWidget
 
 from .. import colores
-from ..arbitros import ESTRELLAS_MAX, texto_calificacion
+from ..arbitros import COMENTARIO_MAX, ESTRELLAS_MAX, texto_calificacion
 
 _ESCALA = 2  # se dibuja al doble para que se vea nítido en pantallas con escala
 
@@ -184,37 +183,28 @@ class CalificacionArbitro(QWidget):
             self._mostrar(self.estrellas.valor())
 
 
-def _iniciales(nombre: str) -> str:
-    partes = [p for p in nombre.split() if p[:1].isalpha()]
-    return "".join(p[0] for p in partes[:2]).upper() or "?"
+class NotaEquipo(QWidget):
+    """Lo que un equipo opina del árbitro: sus estrellas y una nota o comentario opcional."""
 
+    def __init__(self, equipo: str, estrellas: int = 0, comentario: str = "", padre=None):
+        super().__init__(padre)
+        self.titulo = QLabel(f"Calificación de {equipo}", objectName="seccion")
+        self.calificacion = CalificacionArbitro(estrellas)
+        self.calificacion.estrellas.setAccessibleName(f"Calificación del árbitro según {equipo}")
+        self.comentario = QLineEdit(comentario, maxLength=COMENTARIO_MAX)
+        self.comentario.setPlaceholderText("Nota o comentario (opcional)")
+        self.comentario.setAccessibleName(f"Comentario de {equipo} sobre el árbitro")
+        self.comentario.setClearButtonEnabled(True)
+        columna = QVBoxLayout(self)
+        columna.setContentsMargins(0, 0, 0, 0)
+        columna.setSpacing(4)
+        columna.addWidget(self.titulo)
+        columna.addWidget(self.calificacion)
+        columna.addWidget(self.comentario)
 
-def avatar(foto: Path | None, nombre: str, tamano: int = 28) -> QPixmap:
-    """La foto recortada en círculo; si no hay, las iniciales sobre verde claro."""
-    lado = tamano * _ESCALA
-    lienzo = QPixmap(lado, lado)
-    lienzo.fill(Qt.GlobalColor.transparent)
-    pintor = QPainter(lienzo)
-    pintor.setRenderHint(QPainter.RenderHint.Antialiasing)
-    pintor.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    circulo = QPainterPath()
-    circulo.addEllipse(QRectF(0, 0, lado, lado))
-    imagen = QPixmap(str(foto)) if foto else QPixmap()
-    if not imagen.isNull():
-        imagen = imagen.scaled(
-            lado, lado, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation
-        )
-        pintor.setClipPath(circulo)
-        # Las fotos de credencial son verticales: se centra a lo ancho y se deja la cara arriba.
-        pintor.drawPixmap(int((lado - imagen.width()) / 2), int(min(0, (lado - imagen.height()) / 4)), imagen)
-    else:
-        pintor.fillPath(circulo, QColor(colores.VERDE_SUAVE))
-        fuente = QFont("Segoe UI")
-        fuente.setPixelSize(int(lado * 0.4))
-        fuente.setWeight(QFont.Weight.DemiBold)
-        pintor.setFont(fuente)
-        pintor.setPen(QColor(colores.VERDE_ACTIVO))
-        pintor.drawText(QRectF(0, 0, lado, lado), Qt.AlignmentFlag.AlignCenter, _iniciales(nombre))
-    pintor.end()
-    lienzo.setDevicePixelRatio(_ESCALA)
-    return lienzo
+    def valores(self) -> tuple[int | None, str]:
+        return self.calificacion.valor(), self.comentario.text().strip()
+
+    def poner(self, estrellas: int, comentario: str) -> None:
+        self.calificacion.estrellas.setValor(estrellas)
+        self.comentario.setText(comentario)

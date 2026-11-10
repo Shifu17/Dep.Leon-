@@ -272,11 +272,11 @@ def test_buscar_en_equipos_encuentra_jugadores(ventana, app, conn, torneo_id, ca
 
     pagina.busqueda.setText("perez")
     assert textos(pagina.tabla_equipos) == ["Águilas"]
-    assert textos(pagina.tabla_jugadores, 1) == ["Juan Pérez"]
+    assert textos(pagina.tabla_jugadores, 2) == ["Juan Pérez"]
 
     pagina.busqueda.setText("toros")
     assert textos(pagina.tabla_equipos) == ["Toros"]
-    assert textos(pagina.tabla_jugadores, 1) == ["Mateo Ruiz"]  # coincide el equipo: se ven todos
+    assert textos(pagina.tabla_jugadores, 2) == ["Mateo Ruiz"]  # coincide el equipo: se ven todos
 
     pagina.busqueda.clear()
     assert len(textos(pagina.tabla_equipos)) == 2

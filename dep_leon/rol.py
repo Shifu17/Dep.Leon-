@@ -6,6 +6,7 @@ de Fut 11 ocupa el terreno completo, por lo que se empalma con cualquier otro pa
 
 import json
 import random
+import re
 import sqlite3
 import unicodedata
 from dataclasses import dataclass
@@ -45,6 +46,45 @@ def fecha_larga(fecha: date) -> str:
 def nombre_ronda(restantes: int) -> str:
     """Nombre de una ronda según cuántas faltan contando esa: 1 es la final."""
     return RONDAS[restantes - 1] if restantes <= len(RONDAS) else f"Ronda de {2 ** restantes}"
+
+
+def nombre_torneo(texto: str) -> str:
+    """El nombre de un torneo es su temporada, siempre como «2026-2027».
+
+    Acepta «2026-27», «2026 / 2027» o «2026 - 2027» y los deja iguales. Lanza ValueError si no es una
+    temporada de dos años seguidos.
+    """
+    limpio = texto.strip()
+    encontrado = re.fullmatch(r"(\d{4})\s*[-/–]\s*(\d{2}|\d{4})", limpio)
+    if not encontrado:
+        raise ValueError("Escribe la temporada con dos años seguidos, por ejemplo 2026-2027.")
+    inicio = int(encontrado.group(1))
+    fin = encontrado.group(2)
+    fin = int(fin) if len(fin) == 4 else inicio // 100 * 100 + int(fin)
+    if len(encontrado.group(2)) == 2 and fin <= inicio:
+        fin += 100  # 2099-00 es 2099-2100
+    if not 2000 <= inicio <= 2100:
+        raise ValueError("Revisa el año: la temporada debe estar entre 2000 y 2100.")
+    if fin != inicio + 1:
+        raise ValueError(f"El segundo año debe ser el siguiente al primero: {inicio}-{inicio + 1}.")
+    return f"{inicio}-{fin}"
+
+
+TORNEO_PROXIMO = "Próximo"
+TORNEO_ACTIVO = "Activo"
+TORNEO_FINALIZADO = "Finalizado"
+
+
+def estado_torneo(conn: sqlite3.Connection, torneo_id: int) -> str:
+    """Próximo: aún sin resultados. Activo: ya hay resultados y faltan partidos. Finalizado: no falta ninguno."""
+    fila = conn.execute(
+        "SELECT SUM(estado IN (?, ?)) AS jugados, SUM(estado NOT IN (?, ?)) AS pendientes "
+        "FROM partidos WHERE torneo_id = ?",
+        (JUGADO, DEFAULT, JUGADO, DEFAULT, torneo_id),
+    ).fetchone()
+    if not fila["jugados"]:
+        return TORNEO_PROXIMO
+    return TORNEO_ACTIVO if fila["pendientes"] else TORNEO_FINALIZADO
 
 
 def titulo_torneo(nombre: str) -> str:

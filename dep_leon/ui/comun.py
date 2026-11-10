@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QDialogButtonBox,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
@@ -177,15 +178,98 @@ def boton_mas(texto: str, acciones: list[tuple[str, object]]) -> QPushButton:
     return resultado
 
 
-def poner_vacio(tabla_: QTableWidget, texto: str) -> None:
-    """Texto que orienta cuando la tabla no tiene filas, en lugar de un rectángulo en blanco."""
+def poner_vacio(tabla_: QTableWidget, texto: str, accion=None, texto_boton: str = "") -> None:
+    """Texto que orienta cuando la tabla no tiene filas, en lugar de un rectángulo en blanco.
+
+    Con `accion`, abajo del texto aparece un botón para crear el primer registro.
+    """
     if not hasattr(tabla_, "_vacio"):
         tabla_._vacio = QLabel(objectName="vacio", wordWrap=True, alignment=Qt.AlignmentFlag.AlignCenter)
+        tabla_._vacio_boton = None
         disposicion = QVBoxLayout(tabla_.viewport())
-        disposicion.setContentsMargins(24, 48, 24, 24)
-        disposicion.addWidget(tabla_._vacio, 0, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        disposicion.setContentsMargins(24, 24, 24, 24)
+        disposicion.addStretch(1)
+        disposicion.addWidget(tabla_._vacio)  # a todo lo ancho, para que el texto pueda partirse
+        tabla_._vacio_disposicion = disposicion
+        disposicion.addStretch(1)
+    if accion and tabla_._vacio_boton is None:
+        tabla_._vacio_boton = boton(texto_boton or "Agregar", accion, "secundario")
+        tabla_._vacio_disposicion.insertWidget(2, tabla_._vacio_boton, 0, Qt.AlignmentFlag.AlignHCenter)
     tabla_._vacio_texto = texto
     actualizar_vacio(tabla_)
+
+
+def menu_de_fila(tabla_: QTableWidget, acciones: list[tuple[str, object]]) -> None:
+    """Clic derecho sobre una fila: la elige y ofrece sus acciones (Editar, Eliminar...)."""
+    tabla_.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+
+    def mostrar(posicion):
+        fila = tabla_.rowAt(posicion.y())
+        if fila < 0:
+            return
+        tabla_.selectRow(fila)
+        menu = QMenu(tabla_)
+        for nombre, accion in acciones:
+            menu.addAction(nombre).triggered.connect(lambda _=False, a=accion: a())
+        menu.exec(tabla_.viewport().mapToGlobal(posicion))
+
+    tabla_.customContextMenuRequested.connect(mostrar)
+
+
+class AccionesDeFila:
+    """Botones con icono (Editar, Eliminar...) que aparecen solo en la fila elegida de la tabla.
+
+    `acciones` es una lista de (icono, texto, función, estilo). Llamar `colocar()` después de volver a
+    llenar la tabla, porque al llenarla se quitan.
+    """
+
+    def __init__(self, tabla_: QTableWidget, columna: int, acciones):
+        self.tabla = tabla_
+        self.columna = columna
+        self.acciones = acciones
+        self._fila: int | None = None
+        tabla_.itemSelectionChanged.connect(self.colocar)
+        tabla_.horizontalHeader().sortIndicatorChanged.connect(lambda *_: self.colocar())
+        ancho = len(acciones) * 34 + 2
+        tabla_.horizontalHeader().setSectionResizeMode(columna, QHeaderView.ResizeMode.Fixed)
+        tabla_.setColumnWidth(columna, ancho)
+
+    def _botones(self) -> QWidget:
+        caja = QWidget()
+        fila = QHBoxLayout(caja)
+        fila.setContentsMargins(2, 0, 2, 0)
+        fila.setSpacing(4)
+        for icono, texto, accion, estilo in self.acciones:
+            control = QPushButton(objectName="icono" if estilo != "peligro" else "iconoPeligro")
+            control.setIcon(diseno.icono(icono, diseno.color_icono_de(estilo or "secundario")))
+            control.setIconSize(QSize(16, 16))
+            control.setFixedSize(30, 28)
+            control.setToolTip(texto)
+            control.setAccessibleName(texto)
+            control.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+            control.clicked.connect(lambda _=False, a=accion: a())
+            fila.addWidget(control)
+        return caja
+
+    def colocar(self) -> None:
+        if self._fila is not None and self._fila < self.tabla.rowCount():
+            self.tabla.removeCellWidget(self._fila, self.columna)
+        for r in range(self.tabla.rowCount()):
+            self.tabla.removeCellWidget(r, self.columna)
+        fila = self.tabla.currentRow() if self.tabla.selectedItems() else -1
+        self._fila = fila if fila >= 0 else None
+        if self._fila is not None:
+            self.tabla.setCellWidget(self._fila, self.columna, self._botones())
+
+
+def boton_opciones(acciones: list[tuple[str, object]], de: str) -> QPushButton:
+    """Botón de tres puntos con las acciones de la fila elegida; ocupa poco y siempre cabe en una fila."""
+    resultado = boton_mas("Más", acciones)
+    resultado.setIcon(diseno.icono("opciones", diseno.color_icono_de("secundario"), aire=6))
+    resultado.setIconSize(QSize(22, 16))
+    resultado.setAccessibleName(f"Más acciones de {de}")
+    resultado.setToolTip(f"Editar o eliminar {de} (también con clic derecho en la fila)")
+    return resultado
 
 
 def actualizar_vacio(tabla_: QTableWidget) -> None:
@@ -197,6 +281,8 @@ def actualizar_vacio(tabla_: QTableWidget) -> None:
     else:
         tabla_._vacio.setText("Ninguna fila coincide con la búsqueda.")
     tabla_._vacio.setVisible(visibles == 0)
+    if tabla_._vacio_boton is not None:
+        tabla_._vacio_boton.setVisible(tabla_.rowCount() == 0)
 
 
 def boton(texto: str, al_pulsar, estilo: str | None = None, icono: str | None = None) -> QPushButton:
@@ -302,9 +388,15 @@ def campo_busqueda(tabla_: QTableWidget, ayuda: str, al_cambiar=None, ancho: int
     return campo
 
 
-def al_activar(tabla_: QTableWidget, accion) -> None:
-    """Doble clic o Enter sobre una fila ejecutan su acción principal."""
-    tabla_.doubleClicked.connect(lambda *_: accion())
+def al_activar(tabla_: QTableWidget, accion, doble_clic=None) -> None:
+    """Doble clic o Enter sobre una fila ejecutan su acción principal.
+
+    Con `doble_clic`, el doble clic recibe la celda tocada y decide (por ejemplo, editar ahí mismo).
+    """
+    if doble_clic:
+        tabla_.doubleClicked.connect(doble_clic)
+    else:
+        tabla_.doubleClicked.connect(lambda *_: accion())
     for tecla in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
         atajo = QShortcut(QKeySequence(tecla), tabla_)
         atajo.setContext(Qt.ShortcutContext.WidgetShortcut)

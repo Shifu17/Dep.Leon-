@@ -9,6 +9,7 @@ y todos comparten el mismo trazo. Si la fuente no está, el botón queda solo co
 """
 
 import atexit
+import weakref
 from functools import cache
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QRectF, QSize, Qt
@@ -48,6 +49,7 @@ ICONOS = {
     "imagen": "",
     "persona": "",
     "arbitros": "",
+    "opciones": "",
 }
 
 # El icono de un botón se elige por la primera palabra de su texto: así todos los botones que hacen
@@ -121,13 +123,31 @@ _EVENTOS_DE_LUGAR = (QEvent.Type.Move, QEvent.Type.Resize, QEvent.Type.Show, QEv
 _cerrando = False
 
 
+_filtros: "weakref.WeakSet[QObject]" = weakref.WeakSet()
+
+
 def _al_cerrar() -> None:
-    # Al salir, Python se apaga antes que Qt: los filtros dejan de trabajar para no fallar.
+    """Al salir, Python se apaga antes que Qt: se quitan los filtros para que Qt ya no los llame."""
     global _cerrando
     _cerrando = True
+    for filtro in list(_filtros):
+        try:
+            filtro.retirar()
+        except (RuntimeError, SystemError):  # el objeto de Qt ya no existe
+            pass
 
 
 atexit.register(_al_cerrar)
+_registrado_tarde = False
+
+
+def _registrar_cierre() -> None:
+    # Qt registra su propio cierre al crear la aplicación; este debe correr antes que el suyo,
+    # y atexit corre al revés del orden de registro.
+    global _registrado_tarde
+    if not _registrado_tarde:
+        atexit.register(_al_cerrar)
+        _registrado_tarde = True
 
 
 class _Sombras(QObject):
@@ -142,6 +162,15 @@ class _Sombras(QObject):
         self.contenedor = contenedor
         self.tarjetas: list[QWidget] = []
         contenedor.installEventFilter(self)
+        _filtros.add(self)
+
+    def retirar(self) -> None:
+        self.contenedor.removeEventFilter(self)
+        for tarjeta in self.tarjetas:
+            try:
+                tarjeta.removeEventFilter(self)
+            except RuntimeError:
+                pass
 
     def agregar(self, tarjeta: QWidget) -> None:
         self.tarjetas.append(tarjeta)
@@ -201,6 +230,7 @@ def sombra(tarjeta: QWidget) -> QWidget:
             sombras.agregar(tarjeta)
         return True
 
+    _registrar_cierre()
     if not colocar():
         tarjeta.installEventFilter(_AlColocar(tarjeta, colocar))
     return tarjeta
@@ -212,6 +242,11 @@ class _AlColocar(QObject):
     def __init__(self, tarjeta: QWidget, colocar):
         super().__init__(tarjeta)
         self.colocar = colocar
+        self.tarjeta = tarjeta
+        _filtros.add(self)
+
+    def retirar(self) -> None:
+        self.tarjeta.removeEventFilter(self)
 
     def eventFilter(self, objeto, evento) -> bool:  # noqa: N802 (nombre de Qt)
         if _cerrando:

@@ -5,8 +5,8 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
-from PySide6.QtCore import QDate, Qt, QTime, Signal
-from PySide6.QtGui import QColor, QKeySequence, QPixmap, QShortcut
+from PySide6.QtCore import QDate, QSize, Qt, QTime, QTimer, Signal
+from PySide6.QtGui import QColor, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -21,7 +21,11 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
+    QProgressBar,
+    QPushButton,
     QSpinBox,
+    QStyledItemDelegate,
     QTableWidgetItem,
     QTimeEdit,
     QVBoxLayout,
@@ -30,11 +34,24 @@ from PySide6.QtWidgets import (
 
 from .. import asistencia, cobros, colores, credenciales, excel, registro, rol
 from ..db import clave_orden
-from ..jugadores import NUMERO_MAX, POSICIONES, borrar_foto, error_de_edad, guardar_foto
+from ..jugadores import (
+    NUMERO_MAX,
+    POSICIONES,
+    borrar_foto,
+    error_de_edad,
+    faltantes,
+    guardar_foto,
+    motivo_no_elegible,
+)
 from ..paths import fotos_dir
+from . import campos
+from .avatar import GRIS, VERDE, avatar
+from .chips import DORADO as CHIP_DORADO, GRIS as CHIP_GRIS, VERDE as CHIP_VERDE, chips_en
 from . import diseno
 from .comun import (
+    AccionesDeFila,
     AvisoCampo,
+    actualizar_vacio,
     al_activar,
     boton,
     boton_mas,
@@ -49,6 +66,7 @@ from .comun import (
     info,
     listo,
     llenar,
+    menu_de_fila,
     poner_vacio,
     tabla,
 )
@@ -67,6 +85,10 @@ class DialogoEquipo(QDialog):
         self.asistente = QLineEdit(equipo["asistente"] if equipo else "")
         self.director = QLineEdit(equipo["director"] if equipo else "")
         self.telefono = QLineEdit(equipo["telefono"] if equipo else "")
+        campos.solo_nombre_de_equipo(self.nombre, "Ejemplo: Club Deportivo León")
+        for persona in (self.responsable, self.asistente, self.director):
+            campos.solo_nombre(persona)
+        campos.solo_telefono(self.telefono)
         self.rama = QComboBox()
         self.rama.addItem("Sin indicar", "")
         for rama in credenciales.RAMAS:
@@ -81,12 +103,16 @@ class DialogoEquipo(QDialog):
         forma.addRow("Entrenador:", self.responsable)
         forma.addRow("Asistente:", self.asistente)
         forma.addRow("Director general:", self.director)
-        forma.addRow("Teléfono:", self.telefono)
+        self.error_telefono = fila_con_error(forma, "Teléfono:", self.telefono)
         forma.addRow(botones_dialogo(self, self._aceptar))
 
     def _aceptar(self):
         if not self.nombre.text().strip():
             self.error_nombre.mostrar("Escribe el nombre del equipo.")
+            return
+        motivo = campos.error_telefono(self.telefono.text())
+        if motivo:
+            self.error_telefono.mostrar(motivo)
             return
         self.accept()
 
@@ -178,6 +204,8 @@ class DialogoJugador(QDialog):
         self.numero = QSpinBox(minimum=-1, maximum=NUMERO_MAX, value=-1, specialValueText="Sin número")
         self.curp = QLineEdit(jugador["curp"] if jugador else "", maxLength=18)
         self.curp.setPlaceholderText("18 letras y números (opcional)")
+        campos.solo_nombre(self.nombre, "Nombre y apellidos")
+        campos.solo_curp(self.curp)
         self.posicion = QComboBox()
         self.posicion.addItems([""] + POSICIONES)
         self.vista_foto = QLabel("Sin foto", objectName="marcoFoto", alignment=Qt.AlignmentFlag.AlignCenter)
@@ -515,6 +543,37 @@ class DialogoListaEquipo(QDialog):
         self.accept()
 
 
+def expedientes(conn, equipo_ids) -> dict[int, sqlite3.Row]:
+    """Por equipo: jugadores, cuántos con foto, con CURP, con número y con todo completo."""
+    ids = list(equipo_ids)
+    if not ids:
+        return {}
+    marcas = ",".join("?" * len(ids))
+    return {
+        f["equipo_id"]: f
+        for f in conn.execute(
+            f"""SELECT equipo_id, COUNT(*) AS total, SUM(foto <> '') AS con_foto, SUM(curp <> '') AS con_curp,
+                       SUM(numero IS NOT NULL) AS con_numero,
+                       SUM(foto <> '' AND curp <> '' AND numero IS NOT NULL) AS completos
+                FROM jugadores WHERE equipo_id IN ({marcas}) GROUP BY equipo_id""",
+            ids,
+        )
+    }
+
+
+def porcentaje(resumen) -> int | None:
+    """Porcentaje de jugadores con expediente completo; None si el equipo no tiene jugadores."""
+    if resumen is None or not resumen["total"]:
+        return None
+    return round(100 * resumen["completos"] / resumen["total"])
+
+
+def _chip_completo(texto: str):
+    if texto == "100%":
+        return CHIP_VERDE
+    return CHIP_GRIS if texto in ("0%", "-") else CHIP_DORADO
+
+
 class DatosEquipo(QFrame):
     """Los datos del equipo como vienen en la hoja de registro, cada uno en su lugar."""
 
@@ -544,6 +603,17 @@ class DatosEquipo(QFrame):
             rejilla.addLayout(caja, i // 4, i % 4)
         for c in range(4):
             rejilla.setColumnStretch(c, 1)
+        self.resumen = QLabel(objectName="datoValor")
+        self.resumen.setAccessibleName("Resumen de expedientes")
+        self.avance = QProgressBar(objectName="avance", textVisible=False, maximum=100)
+        self.avance.setAccessibleName("Expedientes completos")
+        self.avance_texto = QLabel(objectName="ayuda")
+        resumen = QHBoxLayout()
+        resumen.setSpacing(12)
+        resumen.addWidget(self.resumen)
+        resumen.addWidget(self.avance, 1)
+        resumen.addWidget(self.avance_texto)
+        rejilla.addLayout(resumen, 2, 0, 1, 4)
 
     def mostrar(self, conn, equipo_id):
         equipo = None
@@ -564,8 +634,56 @@ class DatosEquipo(QFrame):
                 texto = equipo["rama"].capitalize()
             else:
                 texto = equipo[clave]
-            valor.setText(texto or "-")
+            vacio = not texto or texto == "-"
+            valor.setText("Sin dato" if vacio and equipo is not None else (texto or "-"))
             valor.setToolTip(texto or "")
+            nombre = "datoVacio" if vacio else "datoValor"
+            if valor.objectName() != nombre:
+                valor.setObjectName(nombre)
+                valor.style().unpolish(valor)
+                valor.style().polish(valor)
+        self._mostrar_resumen(expedientes(conn, [equipo_id]).get(equipo_id) if equipo is not None else None)
+
+    def _mostrar_resumen(self, fila):
+        total = fila["total"] if fila else 0
+        if not total:
+            self.resumen.setText("Sin jugadores todavía")
+            self.avance.setValue(0)
+            self.avance_texto.setText("")
+            return
+        jugadores = "jugador" if total == 1 else "jugadores"
+        self.resumen.setText(f"{total} {jugadores} · {fila['con_foto']} con foto · {fila['con_curp']} con CURP")
+        valor = porcentaje(fila)
+        self.avance.setValue(valor)
+        self.avance_texto.setText(f"{valor}% con expediente completo")
+        self.avance.setToolTip(
+            f"{fila['completos']} de {total} tienen foto, CURP y número. "
+            f"Con número: {fila['con_numero']}."
+        )
+
+
+class DelegadoNumero(QStyledItemDelegate):
+    """Edita el número de playera en la misma celda; `guardar(jugador_id, numero)` decide si vale."""
+
+    def __init__(self, padre, guardar):
+        super().__init__(padre)
+        self.guardar = guardar
+
+    def createEditor(self, padre, _opcion, _indice):  # noqa: N802 (nombre de Qt)
+        control = QSpinBox(padre, minimum=-1, maximum=NUMERO_MAX, specialValueText="Sin número")
+        control.setAccessibleName("Número de playera")
+        return control
+
+    def setEditorData(self, control, indice):  # noqa: N802
+        texto = indice.data()
+        control.setValue(int(texto) if texto and texto.isdigit() else -1)
+
+    def setModelData(self, control, _modelo, indice):  # noqa: N802
+        control.interpretText()
+        numero = None if control.value() < 0 else control.value()
+        jugador_id = indice.siblingAtColumn(0).data(Qt.ItemDataRole.UserRole)
+        # La tabla se vuelve a llenar después de cerrar el editor, nunca mientras está abierto.
+        QTimer.singleShot(0, lambda: self.guardar(jugador_id, numero))
 
 
 class PaginaEquipos(QWidget):
@@ -581,44 +699,85 @@ class PaginaEquipos(QWidget):
         self.filtros.cambiado.connect(self.refrescar_equipos)
 
         excel_fila = diseno.FilaBotones()
-        importar = boton("Importar Excel", self.importar_excel, "secundario")
+        acciones = QPushButton("Acciones", objectName="mas")
+        acciones.setIcon(diseno.icono("lista", colores.VERDE_ACTIVO, aire=6))
+        acciones.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        acciones.setToolTip("Importar o exportar las hojas de registro de Excel y generar credenciales.")
+        menu = QMenu(acciones)
+        menu.setToolTipsVisible(True)
+        importar = menu.addAction(diseno.icono("importar", colores.VERDE_ACTIVO), "Importar Excel...")
         importar.setToolTip("Registra equipos y jugadores desde las hojas de registro de los clubes, con sus fotos.")
-        exportar = boton_mas(
-            "Exportar Excel",
-            [
-                ("Solo el equipo elegido", self.exportar_registro),
-                ("Todos los equipos de la lista (un archivo por equipo)", self.exportar_todos),
-            ],
+        importar.triggered.connect(lambda: self.importar_excel())
+        exportar = menu.addMenu(diseno.icono("exportar", colores.VERDE_ACTIVO), "Exportar Excel")
+        exportar.addAction("Solo el equipo elegido...").triggered.connect(lambda: self.exportar_registro())
+        exportar.addAction("Todos los equipos de la lista (un archivo por equipo)...").triggered.connect(
+            lambda: self.exportar_todos()
         )
-        exportar.setIcon(diseno.icono("exportar", colores.VERDE_ACTIVO, aire=6))
-        exportar.setToolTip("Guarda la hoja de registro con el mismo formato de los clubes: jugadores, "
-                            "pase de lista y credenciales con foto.")
-        credenciales_pdf = boton("Credenciales PDF", self.generar_credenciales, "secundario")
-        credenciales_pdf.setToolTip("Credenciales del equipo elegido, listas para imprimir y recortar.")
-        excel_fila.addWidget(importar)
-        excel_fila.addWidget(exportar)
-        excel_fila.addWidget(credenciales_pdf)
+        menu.addSeparator()
+        pdf = menu.addAction(diseno.icono("credencial", colores.VERDE_ACTIVO), "Credenciales PDF...")
+        pdf.setToolTip("Credenciales del equipo elegido, listas para imprimir y recortar.")
+        pdf.triggered.connect(lambda: self.generar_credenciales())
+        acciones.setMenu(menu)
+        self.boton_acciones = acciones
+        excel_fila.addWidget(acciones)
 
-        self.tabla_equipos = tabla(["Equipo", "Categoría", "Rama", "Jugadores"], estirar=0)
-        self.tabla_jugadores = tabla(
-            ["Núm.", "Nombre completo", "Nacimiento", "CURP", "Asistencias", "Foto"], estirar=1
+        self.tabla_equipos = tabla(["Equipo", "Categoría", "Jug.", "%"], estirar=0)
+        self.tabla_equipos.setIconSize(QSize(26, 26))
+        chips_en(self.tabla_equipos, 3, _chip_completo, pequeno=True)
+        self.tabla_equipos.horizontalHeaderItem(2).setToolTip("Jugadores registrados")
+        self.tabla_equipos.horizontalHeaderItem(3).setToolTip(
+            "Porcentaje de jugadores con expediente completo: foto, CURP y número"
         )
+        self.tabla_jugadores = tabla(
+            ["Foto", "Núm.", "Nombre completo", "Nacimiento", "CURP", "Asist.", "Avisos", ""], estirar=2
+        )
+        # Foto y avisos llevan icono en lugar de título: así esas columnas ocupan solo lo de su icono.
+        for columna, icono, ayuda in (
+            (0, "persona", "Foto"),
+            (6, "aviso", "Avisos: rojo si no entra en su categoría; ámbar si le falta CURP, foto o número"),
+        ):
+            encabezado = self.tabla_jugadores.horizontalHeaderItem(columna)
+            encabezado.setText("")
+            encabezado.setIcon(diseno.icono(icono, colores.TEXTO_SUAVE, 14))
+            encabezado.setToolTip(ayuda)
+            encabezado.setData(Qt.ItemDataRole.AccessibleTextRole, ayuda)
+        self.acciones_jugador = AccionesDeFila(self.tabla_jugadores, 7, [
+            ("editar", "Editar jugador", self.editar_jugador, "secundario"),
+            ("eliminar", "Eliminar jugador", self.borrar_jugador, "peligro"),
+        ])
+        menu_de_fila(self.tabla_jugadores, [
+            ("Editar jugador", self.editar_jugador),
+            ("Cambiar número", self._editar_numero),
+            ("Eliminar jugador", self.borrar_jugador),
+        ])
+        self.tabla_jugadores.setIconSize(QSize(26, 26))
+        self.tabla_jugadores.horizontalHeaderItem(5).setToolTip("Asistencias a los partidos con pase de lista")
+        self.tabla_jugadores.horizontalHeaderItem(6).setToolTip(
+            "Rojo: no entra en su categoría por año de nacimiento. Ámbar: le falta CURP, foto o número."
+        )
+        self.tabla_jugadores.setItemDelegateForColumn(1, DelegadoNumero(self.tabla_jugadores, self._cambiar_numero))
         self.tabla_equipos.itemSelectionChanged.connect(self.refrescar_jugadores)
         al_activar(self.tabla_equipos, self.editar_equipo)
-        al_activar(self.tabla_jugadores, self.editar_jugador)
+        al_activar(self.tabla_jugadores, self.editar_jugador, self._doble_clic_jugador)
         poner_vacio(self.tabla_equipos, "No hay equipos en este torneo.")
         poner_vacio(self.tabla_jugadores, "Selecciona un equipo para ver sus jugadores.")
         self.busqueda = campo_busqueda(self.tabla_equipos, "Buscar equipo o jugador", self._buscar)
         excel_fila.addWidget(self.busqueda)
+        self.solo_incompletos = QCheckBox("Solo incompletos")
+        self.solo_incompletos.setToolTip("Muestra solo a los jugadores a los que les falta CURP, foto o número.")
+        self.solo_incompletos.toggled.connect(self._filtrar_jugadores)
+        excel_fila.addWidget(self.solo_incompletos)
 
         izquierda = QVBoxLayout()
         izquierda.addWidget(QLabel("Equipos", objectName="seccion"))
         izquierda.addWidget(self.tabla_equipos)
         fila = diseno.FilaBotones()
-        fila.addWidget(boton("Editar equipo", self.editar_equipo, "secundario"))
+        editar = boton("Editar", self.editar_equipo, "secundario")
+        editar.setToolTip("Editar los datos del equipo elegido")
+        fila.addWidget(editar)
         fila.addWidget(
             boton_mas(
-                "Más opciones",
+                "Más",
                 [
                     ("Días y horas en que puede jugar", self.editar_disponibilidad),
                     ("Descargar plantilla de Excel vacía", self.descargar_plantilla),
@@ -636,8 +795,6 @@ class PaginaEquipos(QWidget):
         derecha.addWidget(self.tabla_jugadores, 1)
         fila = diseno.FilaBotones()
         fila.addWidget(boton("Agregar jugador", self.nuevo_jugador))
-        fila.addWidget(boton("Editar", self.editar_jugador, "secundario"))
-        fila.addWidget(boton("Eliminar", self.borrar_jugador, "peligro"))
         lista = boton("Pase de lista", self.pase_de_lista, "secundario")
         lista.setToolTip("Asistencia de los jugadores del equipo en cada partido (J1, J2...).")
         fila.addWidget(lista)
@@ -645,8 +802,8 @@ class PaginaEquipos(QWidget):
 
         columnas = QHBoxLayout()
         columnas.setSpacing(14)
-        columnas.addLayout(izquierda, 1)
-        columnas.addLayout(derecha, 2)
+        columnas.addLayout(izquierda, 2)
+        columnas.addLayout(derecha, 5)
 
         raiz = QVBoxLayout(self)
         raiz.addWidget(diseno.encabezado(
@@ -706,6 +863,13 @@ class PaginaEquipos(QWidget):
         celda = self.tabla_equipos.item(fila, 0) if fila >= 0 else None
         por_equipo = celda is not None and clave_orden(texto.strip()) in clave_orden(celda.text())
         filtrar(self.tabla_jugadores, "" if por_equipo else texto)
+        if self.solo_incompletos.isChecked():
+            avisos = getattr(self, "_avisos", {})
+            for r in range(self.tabla_jugadores.rowCount()):
+                jugador_id = self.tabla_jugadores.item(r, 0).data(Qt.ItemDataRole.UserRole)
+                if not avisos.get(jugador_id, (None, []))[1]:
+                    self.tabla_jugadores.setRowHidden(r, True)
+            actualizar_vacio(self.tabla_jugadores)
 
     def refrescar_equipos(self):
         filas = self.conn.execute(
@@ -715,19 +879,26 @@ class PaginaEquipos(QWidget):
                WHERE e.torneo_id = ? AND (? IS NULL OR e.categoria_id = ?)
                GROUP BY e.id ORDER BY c.nombre COLLATE ES, e.nombre COLLATE ES""",
             (self._torneo_id(), self.categoria.currentData(), self.categoria.currentData()),
-        )
+        ).fetchall()
+        resumen = expedientes(self.conn, (f["id"] for f in filas))
         llenar(
             self.tabla_equipos,
             [
                 (
                     f["id"],
                     [
-                        f["nombre"], f["categoria"], f["rama"].capitalize() or "-", f["total"],
+                        f["nombre"], f["categoria"], f["total"],
+                        "-" if porcentaje(resumen.get(f["id"])) is None else f"{porcentaje(resumen[f['id']])}%",
                     ],
                 )
                 for f in filas
             ],
         )
+        for r in range(self.tabla_equipos.rowCount()):
+            celda = self.tabla_equipos.item(r, 0)
+            celda.setIcon(QIcon(avatar(None, celda.text(), 26, VERDE)))
+        # Con una categoría elegida, esa columna diría lo mismo en todos los renglones.
+        self.tabla_equipos.setColumnHidden(1, self.categoria.currentData() is not None)
         poner_vacio(
             self.tabla_equipos,
             "No hay equipos en este torneo. Pulsa «Agregar equipo» o «Importar Excel»."
@@ -749,26 +920,35 @@ class PaginaEquipos(QWidget):
         filas = self.conn.execute(
             "SELECT * FROM jugadores WHERE equipo_id = ? ORDER BY numero IS NULL, numero, nombre COLLATE ES",
             (equipo_id,),
-        )
+        ).fetchall()
+        categoria = self._categoria_del_equipo(equipo_id) if equipo_id is not None else None
         asistencias, con_lista = (
             asistencia.resumen_de_equipo(self.conn, equipo_id) if equipo_id is not None else ({}, 0)
         )
+        self._jugadores = {j["id"]: j for j in filas}
+        self._avisos: dict[int, tuple[str | None, list[str]]] = {}
+        for j in filas:
+            fecha = date.fromisoformat(j["fecha_nacimiento"])
+            fuera = motivo_no_elegible(fecha, categoria["anio_min"], categoria["anio_max"]) if categoria else None
+            self._avisos[j["id"]] = (fuera, faltantes(j))
         llenar(
             self.tabla_jugadores,
             [
                 (
                     j["id"],
                     [
-                        j["numero"], j["nombre"],
+                        "", j["numero"], j["nombre"],
                         date.fromisoformat(j["fecha_nacimiento"]).strftime("%d/%m/%Y"),
                         j["curp"] or "-",
                         f"{asistencias.get(j['id'], 0)} de {con_lista}" if con_lista else "-",
-                        "Sí" if j["foto"] else "No",
+                        "",
                     ],
                 )
                 for j in filas
             ],
         )
+        self._decorar_jugadores()
+        self.acciones_jugador.colocar()
         poner_vacio(
             self.tabla_jugadores,
             "Este equipo no tiene jugadores. Pulsa «Agregar jugador» o importa su hoja de registro."
@@ -776,6 +956,61 @@ class PaginaEquipos(QWidget):
             else "Selecciona un equipo para ver sus jugadores.",
         )
         self._filtrar_jugadores()
+
+    def _decorar_jugadores(self):
+        """Foto redonda, avisos del expediente y la marca roja de quien no entra en su categoría."""
+        aviso_rojo = diseno.icono("aviso", colores.ROJO, 18)
+        aviso_ambar = diseno.icono("aviso", colores.DORADO_TEXTO, 18)
+        for r in range(self.tabla_jugadores.rowCount()):
+            jugador_id = self.tabla_jugadores.item(r, 0).data(Qt.ItemDataRole.UserRole)
+            j = self._jugadores[jugador_id]
+            foto = self.tabla_jugadores.item(r, 0)
+            foto.setIcon(QIcon(avatar(fotos_dir() / j["foto"] if j["foto"] else None, j["nombre"], 26, GRIS)))
+            foto.setToolTip("Con foto" if j["foto"] else "Sin foto")
+            numero = self.tabla_jugadores.item(r, 1)
+            numero.setToolTip("Doble clic para cambiar el número")
+            fuera, falta = self._avisos[jugador_id]
+            avisos = self.tabla_jugadores.item(r, 6)
+            partes = []
+            if fuera:
+                partes.append(fuera)
+                nacimiento = self.tabla_jugadores.item(r, 3)
+                nacimiento.setForeground(QColor(colores.ROJO))
+                nacimiento.setToolTip(fuera)
+            if falta:
+                partes.append("Le falta: " + ", ".join(falta) + ".")
+            if partes:
+                avisos.setIcon(aviso_rojo if fuera else aviso_ambar)
+                avisos.setToolTip("\n".join(partes))
+                avisos.setData(Qt.ItemDataRole.AccessibleTextRole, " ".join(partes))
+            else:
+                avisos.setToolTip("Expediente completo")
+
+    def _editar_numero(self):
+        fila = self.tabla_jugadores.currentRow()
+        if fila >= 0:
+            self.tabla_jugadores.editItem(self.tabla_jugadores.item(fila, 1))
+
+    def _doble_clic_jugador(self, indice):
+        if indice.column() == 1:
+            self.tabla_jugadores.editItem(self.tabla_jugadores.item(indice.row(), 1))
+        else:
+            self.editar_jugador()
+
+    def _cambiar_numero(self, jugador_id, numero):
+        jugador = self._jugadores.get(jugador_id)
+        if jugador is None or jugador["numero"] == numero:
+            self.refrescar_jugadores()
+            return
+        try:
+            with self.conn:
+                self.conn.execute("UPDATE jugadores SET numero = ? WHERE id = ?", (numero, jugador_id))
+        except sqlite3.IntegrityError:
+            self.refrescar_jugadores()
+            error(self, f"El número {numero} ya lo tiene otro jugador de este equipo.")
+            return
+        self.refrescar_jugadores()
+        listo(self, "número guardado.")
 
     def _avisar_cambio(self, mensaje: str = "cambios guardados."):
         self.refrescar_equipos()
@@ -1109,6 +1344,20 @@ class PaginaEquipos(QWidget):
         if self.tabla_jugadores.rowCount() == 0:
             error(self, "Este equipo todavía no tiene jugadores.")
             return
+        resumen = expedientes(self.conn, [equipo_id]).get(equipo_id)
+        sin_foto, sin_curp = resumen["total"] - resumen["con_foto"], resumen["total"] - resumen["con_curp"]
+        if sin_foto or sin_curp:
+            faltan = []
+            if sin_foto:
+                faltan.append(_cuantos(sin_foto, "jugador no tiene foto", "jugadores no tienen foto"))
+            if sin_curp:
+                faltan.append(_cuantos(sin_curp, "jugador no tiene CURP", "jugadores no tienen CURP"))
+            if not confirmar(
+                self,
+                " y ".join(faltan) + ". Sus credenciales saldrán con ese espacio vacío.\n\n"
+                "¿Generar las credenciales de todos modos? Con «Solo incompletos» ves quiénes son.",
+            ):
+                return
         fila = self.tabla_equipos.currentRow()
         nombre = self.tabla_equipos.item(fila, 0).text()
         sugerido = str(Path.home() / f"Credenciales {_nombre_archivo(nombre)}.pdf")

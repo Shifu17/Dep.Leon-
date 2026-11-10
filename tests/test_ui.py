@@ -59,8 +59,8 @@ def test_equipos_muestra_jugadores(ventana, conn, infantil_id, torneo_id):
     pagina = ventana.equipos
     pagina.refrescar()
     pagina.tabla_equipos.selectRow(0)
-    assert pagina.tabla_jugadores.item(0, 1).text() == "Ana"
-    assert pagina.tabla_jugadores.item(0, 2).text() == "01/05/2009"
+    assert pagina.tabla_jugadores.item(0, 2).text() == "Ana"
+    assert pagina.tabla_jugadores.item(0, 3).text() == "01/05/2009"
 
 
 @pytest.fixture

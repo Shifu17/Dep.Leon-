@@ -207,8 +207,14 @@ CREATE TABLE IF NOT EXISTS arbitros (
 );
 CREATE TABLE IF NOT EXISTS arbitrajes (
     partido_id INTEGER PRIMARY KEY REFERENCES partidos(id) ON DELETE CASCADE,
-    arbitro_id INTEGER NOT NULL REFERENCES arbitros(id) ON DELETE RESTRICT,
-    calificacion INTEGER CHECK (calificacion BETWEEN 1 AND 5)
+    arbitro_id INTEGER NOT NULL REFERENCES arbitros(id) ON DELETE RESTRICT
+);
+CREATE TABLE IF NOT EXISTS calificaciones_arbitro (
+    partido_id INTEGER NOT NULL REFERENCES arbitrajes(partido_id) ON DELETE CASCADE,
+    equipo_id INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+    estrellas INTEGER CHECK (estrellas BETWEEN 1 AND 5),
+    comentario TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (partido_id, equipo_id)
 );
 CREATE TABLE IF NOT EXISTS config_rol (
     torneo_id INTEGER PRIMARY KEY REFERENCES torneos(id) ON DELETE CASCADE,
@@ -240,6 +246,38 @@ def _migrar(conn: sqlite3.Connection) -> None:
             with conn:
                 conn.execute(f"ALTER TABLE equipos ADD COLUMN {columna} TEXT NOT NULL DEFAULT ''")
     _migrar_jugadores(conn)
+    _migrar_calificaciones(conn)
+    _migrar_temporadas(conn)
+
+
+def _migrar_temporadas(conn: sqlite3.Connection) -> None:
+    """Los torneos se nombran con la temporada completa: «2026» pasa a «2026-2027».
+
+    Si la liga ya tiene un torneo con ese nombre, se deja como estaba para no juntarlos.
+    """
+    with conn:
+        conn.execute(
+            "UPDATE OR IGNORE torneos SET nombre = nombre || '-' || (CAST(nombre AS INTEGER) + 1) "
+            "WHERE nombre GLOB '[12][0-9][0-9][0-9]'"
+        )
+
+
+def _migrar_calificaciones(conn: sqlite3.Connection) -> None:
+    """En la 0.9.9 el árbitro tenía una sola calificación por partido; ahora la da cada equipo.
+
+    La que ya existía se conserva como la de los dos equipos, sin comentario.
+    """
+    if "calificacion" not in {c["name"] for c in conn.execute("PRAGMA table_info(arbitrajes)")}:
+        return
+    with conn:
+        conn.execute(
+            """INSERT OR IGNORE INTO calificaciones_arbitro (partido_id, equipo_id, estrellas)
+               SELECT x.partido_id, e.id, x.calificacion FROM arbitrajes x
+               JOIN partidos p ON p.id = x.partido_id
+               JOIN equipos e ON e.id IN (p.local_id, p.visitante_id)
+               WHERE x.calificacion IS NOT NULL"""
+        )
+        conn.execute("ALTER TABLE arbitrajes DROP COLUMN calificacion")
 
 
 def _migrar_jugadores(conn: sqlite3.Connection) -> None:

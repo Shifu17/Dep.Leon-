@@ -21,6 +21,39 @@ def error_de_edad(fecha: date, anio_min: int | None, anio_max: int | None) -> st
     return None
 
 
+def rango_anios(anio_min: int | None, anio_max: int | None) -> str:
+    """«2012» si es un solo año; «2009–2010» si son varios; «Sin límite» en una categoría libre."""
+    if anio_min is None and anio_max is None:
+        return "Sin límite"
+    if anio_min is None or anio_max is None:
+        return f"Desde {anio_min}" if anio_max is None else f"Hasta {anio_max}"
+    return str(anio_min) if anio_min == anio_max else f"{anio_min}–{anio_max}"
+
+
+def motivo_no_elegible(nacimiento: date, anio_min: int | None, anio_max: int | None) -> str | None:
+    """Por qué el jugador no entra en su categoría; None si entra o si la categoría es libre."""
+    if anio_min is None and anio_max is None:
+        return None
+    fuera = (anio_min is not None and nacimiento.year < anio_min) or (
+        anio_max is not None and nacimiento.year > anio_max
+    )
+    if not fuera:
+        return None
+    return f"Nació en {nacimiento.year}, la categoría permite {rango_anios(anio_min, anio_max)}."
+
+
+def faltantes(jugador) -> list[str]:
+    """Lo que le falta al expediente del jugador para estar completo."""
+    falta = []
+    if not jugador["curp"]:
+        falta.append("CURP")
+    if not jugador["foto"]:
+        falta.append("foto")
+    if jugador["numero"] is None:
+        falta.append("número")
+    return falta
+
+
 def guardar_foto(origen: Path, destino_dir: Path) -> str:
     """Copia la foto ya reducida a la carpeta del programa y devuelve el nombre del archivo.
 

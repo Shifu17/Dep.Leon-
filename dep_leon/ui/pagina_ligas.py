@@ -17,16 +17,21 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import diseno
+from .. import rol
+from ..jugadores import rango_anios
+from . import campos, diseno
+from .chips import ESTADO_TORNEO, MODALIDAD, NEUTRO, chips_en, separar_dias
 from .comun import (
     al_activar,
     boton,
+    boton_opciones,
     botones_dialogo,
     confirmar,
     error,
     fila_con_error,
     id_seleccionado,
     llenar,
+    menu_de_fila,
     poner_vacio,
     tabla,
 )
@@ -43,6 +48,8 @@ class DialogoLiga(QDialog):
         self.modalidad.addItems(MODALIDADES)
         self.dias = QLineEdit(liga["dias"] if liga else "")
         self.dias.setPlaceholderText("Ejemplo: Viernes y sábado")
+        campos.solo_nombre_de_equipo(self.nombre, "Ejemplo: Libre Martes")
+        campos.solo_dias(self.dias)
         if liga:
             self.modalidad.setCurrentText(liga["modalidad"])
         forma = QFormLayout(self)
@@ -68,6 +75,7 @@ class DialogoCategoria(QDialog):
         hoy = date.today().year
         self.nombre = QLineEdit(categoria["nombre"] if categoria else "")
         self.nombre.setPlaceholderText("Ejemplo: 2015-2016 o Libre")
+        campos.solo_categoria(self.nombre)
         self.sin_limite = QCheckBox("Sin límite de edad (categoría libre)")
         self.anio_min = QSpinBox(minimum=1940, maximum=hoy, value=hoy - 10)
         self.anio_max = QSpinBox(minimum=1940, maximum=hoy, value=hoy - 10)
@@ -112,15 +120,22 @@ class DialogoTorneo(QDialog):
         super().__init__(padre)
         self.setWindowTitle("Torneo")
         self.nombre = QLineEdit(torneo["nombre"] if torneo else "")
-        self.nombre.setPlaceholderText("Ejemplo: Copa de Verano")
+        self.nombre.setPlaceholderText("Ejemplo: 2026-2027")
+        campos.solo_temporada(self.nombre)
+        self.temporada = ""
         forma = QFormLayout(self)
-        self.error_nombre = fila_con_error(forma, "Nombre:", self.nombre)
+        self.error_nombre = fila_con_error(forma, "Temporada:", self.nombre)
+        forma.addRow(QLabel("Todos los torneos se escriben igual, con los dos años: 2026-2027.",
+                            objectName="ayuda", wordWrap=True))
         forma.addRow(botones_dialogo(self, self._aceptar))
 
     def _aceptar(self):
-        if not self.nombre.text().strip():
-            self.error_nombre.mostrar("Escribe el nombre del torneo.")
+        try:
+            self.temporada = rol.nombre_torneo(self.nombre.text())
+        except ValueError as exc:
+            self.error_nombre.mostrar(str(exc))
             return
+        self.nombre.setText(self.temporada)
         self.accept()
 
 
@@ -132,51 +147,73 @@ class PaginaLigas(QWidget):
         self.setObjectName("pagina")
         self.conn = conn
 
-        self.tabla_ligas = tabla(["Liga", "Modalidad", "Días"], estirar=2)
+        self.tabla_ligas = tabla(["Liga", "Modalidad", "Días", "Categorías", "Equipos"], estirar=2)
         self.tabla_ligas.setWordWrap(False)
-        self.tabla_categorias = tabla(["Categoría", "Años de nacimiento"], estirar=0)
-        self.tabla_torneos = tabla(["Torneo"])
+        chips_en(self.tabla_ligas, 1, lambda texto: MODALIDAD.get(texto, NEUTRO))
+        chips_en(self.tabla_ligas, 2, separar=separar_dias, pequeno=True)
+        self.tabla_categorias = tabla(["Categoría", "Nacidos"], estirar=0)
+        self.tabla_torneos = tabla(["Temporada", "Estado"], estirar=0)
+        chips_en(self.tabla_torneos, 1, lambda texto: ESTADO_TORNEO.get(texto, NEUTRO), pequeno=True)
+        self.tabla_torneos.setToolTip(
+            "Próximo: aún sin resultados. Activo: ya hay resultados y faltan partidos. "
+            "Finalizado: ya se jugaron todos."
+        )
         self.tabla_ligas.itemSelectionChanged.connect(self.refrescar_detalle)
         al_activar(self.tabla_ligas, self.editar_liga)
         al_activar(self.tabla_categorias, self.editar_categoria)
         al_activar(self.tabla_torneos, self.editar_torneo)
-        poner_vacio(self.tabla_categorias, "Esta liga no tiene categorías. Pulsa «Agregar» debajo de esta lista.")
-        poner_vacio(self.tabla_torneos, "Esta liga no tiene torneos. Pulsa «Agregar» para crear uno.")
+        menu_de_fila(self.tabla_ligas, [("Editar liga", self.editar_liga), ("Eliminar liga", self.borrar_liga)])
+        menu_de_fila(self.tabla_categorias, [
+            ("Editar categoría", self.editar_categoria), ("Eliminar categoría", self.borrar_categoria),
+        ])
+        menu_de_fila(self.tabla_torneos, [("Editar torneo", self.editar_torneo), ("Eliminar torneo", self.borrar_torneo)])
+        poner_vacio(self.tabla_categorias, "Esta liga no tiene categorías.", self.nueva_categoria, "Agregar categoría")
+        poner_vacio(self.tabla_torneos, "Esta liga no tiene torneos.", self.nuevo_torneo, "Agregar torneo")
+
+        self.titulo_categorias = QLabel("Categorías", objectName="seccion")
+        self.titulo_torneos = QLabel("Torneos", objectName="seccion")
+
+        ligas = QVBoxLayout()
+        ligas.addWidget(QLabel("Ligas", objectName="seccion"))
+        ligas.addWidget(self.tabla_ligas)
+        fila = diseno.FilaBotones()
+        fila.addWidget(boton("Agregar liga", self.nueva_liga))
+        fila.addWidget(boton("Editar", self.editar_liga, "secundario"))
+        fila.addWidget(boton("Eliminar", self.borrar_liga, "peligro"))
+        ligas.addLayout(fila)
 
         columnas = QHBoxLayout()
-        columnas.addLayout(
-            self._columna("Ligas", self.tabla_ligas, self.nueva_liga, self.editar_liga, self.borrar_liga), 4
-        )
-        columnas.addLayout(
-            self._columna(
-                "Categorías", self.tabla_categorias,
-                self.nueva_categoria, self.editar_categoria, self.borrar_categoria,
-            ), 2,
-        )
-        columnas.addLayout(
-            self._columna(
-                "Torneos", self.tabla_torneos,
-                self.nuevo_torneo, self.editar_torneo, self.borrar_torneo,
-            ), 2,
-        )
+        columnas.setSpacing(14)
+        columnas.addLayout(ligas, 7)
+        columnas.addLayout(self._columna(
+            self.titulo_categorias, self.tabla_categorias, "Agregar", self.nueva_categoria,
+            [("Editar categoría", self.editar_categoria), ("Eliminar categoría", self.borrar_categoria)],
+            "la categoría",
+        ), 3)
+        columnas.addLayout(self._columna(
+            self.titulo_torneos, self.tabla_torneos, "Agregar", self.nuevo_torneo,
+            [("Editar torneo", self.editar_torneo), ("Eliminar torneo", self.borrar_torneo)],
+            "el torneo",
+        ), 3)
 
-        titulo = QLabel("Ligas, categorías y torneos", objectName="titulo")
-        ayuda = QLabel("Selecciona una liga para ver y editar sus categorías y torneos.", objectName="ayudaPagina")
         raiz = QVBoxLayout(self)
-        raiz.addWidget(titulo)
-        raiz.addWidget(ayuda)
+        raiz.addWidget(diseno.encabezado(
+            "Ligas, categorías y torneos",
+            "Toca una liga para ver sus categorías y torneos. Para editar o eliminar, usa el botón «Más» "
+            "o el clic derecho sobre la fila.",
+        ))
         raiz.addLayout(columnas)
         self.refrescar()
         self.tabla_ligas.selectRow(0)
 
-    def _columna(self, titulo, tabla_, nuevo, editar, borrar):
+    def _columna(self, titulo: QLabel, tabla_, texto_agregar, agregar, opciones, de: str):
         columna = QVBoxLayout()
-        columna.addWidget(QLabel(titulo, objectName="seccion"))
+        columna.addWidget(titulo)
         columna.addWidget(tabla_)
-        fila = diseno.FilaBotones()
-        fila.addWidget(boton("Agregar", nuevo))
-        fila.addWidget(boton("Editar", editar, "secundario"))
-        fila.addWidget(boton("Eliminar", borrar, "peligro"))
+        fila = QHBoxLayout()
+        fila.setSpacing(8)
+        fila.addWidget(boton(texto_agregar, agregar), 1)
+        fila.addWidget(boton_opciones(opciones, de))
         columna.addLayout(fila)
         return columna
 
@@ -184,14 +221,23 @@ class PaginaLigas(QWidget):
         llenar(
             self.tabla_ligas,
             [
-                (l["id"], [l["nombre"], l["modalidad"], l["dias"]])
-                for l in self.conn.execute("SELECT * FROM ligas ORDER BY id")
+                (l["id"], [l["nombre"], l["modalidad"], l["dias"], l["categorias"], l["equipos"]])
+                for l in self.conn.execute(
+                    """SELECT l.*,
+                              (SELECT COUNT(*) FROM categorias c WHERE c.liga_id = l.id) AS categorias,
+                              (SELECT COUNT(*) FROM equipos e JOIN torneos t ON t.id = e.torneo_id
+                               WHERE t.liga_id = l.id) AS equipos
+                       FROM ligas l ORDER BY l.id"""
+                )
             ],
         )
         self.refrescar_detalle()
 
     def refrescar_detalle(self):
         liga_id = id_seleccionado(self.tabla_ligas)
+        liga = self.conn.execute("SELECT nombre FROM ligas WHERE id = ?", (liga_id,)).fetchone()
+        self.titulo_categorias.setText(f"Categorías de {liga['nombre']}" if liga else "Categorías")
+        self.titulo_torneos.setText(f"Torneos de {liga['nombre']}" if liga else "Torneos")
         categorias = self.conn.execute(
             "SELECT * FROM categorias WHERE liga_id = ? ORDER BY nombre COLLATE ES", (liga_id,)
         )
@@ -202,7 +248,7 @@ class PaginaLigas(QWidget):
         torneos = self.conn.execute(
             "SELECT * FROM torneos WHERE liga_id = ? ORDER BY nombre COLLATE ES", (liga_id,)
         )
-        llenar(self.tabla_torneos, [(t["id"], [t["nombre"]]) for t in torneos])
+        llenar(self.tabla_torneos, [(t["id"], [t["nombre"], rol.estado_torneo(self.conn, t["id"])]) for t in torneos])
 
     def _guardar(self, sql, parametros, duplicado) -> bool:
         try:
@@ -297,7 +343,7 @@ class PaginaLigas(QWidget):
         if dialogo.exec():
             self._guardar(
                 "INSERT INTO torneos (nombre, liga_id) VALUES (?, ?)",
-                (dialogo.nombre.text().strip(), liga_id), "Ya existe ese torneo en esta liga.",
+                (dialogo.temporada, liga_id), "Ya existe ese torneo en esta liga.",
             )
 
     def editar_torneo(self):
@@ -310,7 +356,7 @@ class PaginaLigas(QWidget):
         if dialogo.exec():
             self._guardar(
                 "UPDATE torneos SET nombre = ? WHERE id = ?",
-                (dialogo.nombre.text().strip(), torneo_id), "Ya existe ese torneo en esta liga.",
+                (dialogo.temporada, torneo_id), "Ya existe ese torneo en esta liga.",
             )
 
     def borrar_torneo(self):
@@ -322,6 +368,4 @@ class PaginaLigas(QWidget):
 
 
 def _rango(categoria) -> str:
-    if categoria["anio_min"] is None and categoria["anio_max"] is None:
-        return "Sin límite"
-    return f"{categoria['anio_min']} a {categoria['anio_max']}"
+    return rango_anios(categoria["anio_min"], categoria["anio_max"])

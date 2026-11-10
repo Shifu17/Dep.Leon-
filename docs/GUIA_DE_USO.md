@@ -43,9 +43,15 @@ Entra a **Ligas y categorías** y selecciona una liga:
 - **Ligas:** ya vienen creadas Femenil, Libre Martes, Libre Miércoles, Libre Jueves, Infantil y Fut 11.
   Puedes editarlas o agregar otras.
 - **Categorías:** las infantiles ya vienen cargadas, de 2009-2010 a 2019-2020. Para las demás ligas,
-  agrega las que uses. Marca **Sin límite de edad** en la categoría libre.
-- **Torneos:** agrega uno, por ejemplo «Copa de Verano». **Este paso es necesario** antes de registrar
-  equipos.
+  agrega las que uses. Marca **Sin límite de edad** en la categoría libre. Los años se ven como «2012» si
+  es uno solo, o «2009–2010» si son varios.
+- **Torneos:** agrega uno con su temporada, siempre con los dos años: **2026-2027**. Si escribes «2026-27»
+  o «2026/2027», el programa lo deja como «2026-2027». **Este paso es necesario** antes de registrar
+  equipos. Cada torneo muestra su estado: **Próximo** (aún sin resultados), **Activo** (ya hay resultados y
+  faltan partidos) o **Finalizado** (ya se jugaron todos).
+
+La tabla de ligas dice cuántas categorías y equipos tiene cada una. Debajo de Categorías y de Torneos está
+**Agregar**; para editar o eliminar, usa el botón **Más** o el clic derecho sobre la fila.
 
 ## 3. Registrar equipos y jugadores
 
@@ -58,7 +64,7 @@ Es el Excel que entrega cada club: **NOMBRE DEL CLUB**, **CATEGORÍA** y **RAMA*
 el entrenador, el asistente y el director general. Si trae la hoja **Cédula** con las fotos de las
 credenciales, las fotos también se importan.
 
-1. Pulsa **Importar Excel** y elige uno o **varios** archivos a la vez (mantén Ctrl para elegir varios).
+1. Pulsa **Acciones → Importar Excel** y elige uno o **varios** archivos a la vez (mantén Ctrl para elegir varios).
    Cada hoja de registro es un equipo, de la categoría que sea.
 2. Revisa la vista previa. Cada equipo aparece con su categoría en el programa:
    - Si la encuentra, ya viene elegida (por nombre o por año de nacimiento, como «2014» en «2013-2014»).
@@ -76,7 +82,7 @@ archivo. Un dato vacío en el archivo no borra lo que ya tenías.
 
 ### Exportar la hoja de registro
 
-Pulsa **Exportar Excel** y elige:
+Pulsa **Acciones → Exportar Excel** y elige:
 
 - **Solo el equipo elegido**, o
 - **Todos los equipos de la lista**: guarda un archivo por equipo en la carpeta que elijas (usa el filtro
@@ -88,15 +94,17 @@ con escudo y foto de cada jugador. Se puede volver a importar.
 
 ### Credenciales
 
-Pulsa **Credenciales PDF** con el equipo elegido. Salen con el acomodo de la cédula de los clubes: escudos,
+Pulsa **Acciones → Credenciales PDF** con el equipo elegido. Si a algún jugador le falta foto o CURP, el
+programa te avisa cuántos son antes de generarlas. Salen con el acomodo de la cédula de los clubes: escudos,
 foto, nombre, CURP, club, fecha de nacimiento, categoría, rama, número de playera, entrenador y director
 general. Caben 10 por hoja carta, con una línea gris para recortar.
 
 ### Desde la plantilla del programa
 
-En **Más opciones**, elige **Descargar plantilla de Excel vacía**; la hoja **Instrucciones** explica cómo
-llenarla. Si hay fotos, ponlas en la misma carpeta que el Excel o en una subcarpeta `fotos` y escribe el
-nombre del archivo en la columna **Foto**. Después pulsa **Importar Excel**.
+En **Más**, debajo de la lista de equipos, elige **Descargar plantilla de Excel vacía**; la hoja
+**Instrucciones** explica cómo llenarla. Si hay fotos, ponlas en la misma carpeta que el Excel o en una
+subcarpeta `fotos` y escribe el nombre del archivo en la columna **Foto**. Después pulsa **Acciones →
+Importar Excel**.
 
 En los dos casos, el programa revisa que la fecha de nacimiento corresponda a la categoría y que no se
 repita el número de playera en un equipo.
@@ -110,27 +118,40 @@ nacimiento, CURP, posición y foto).
 ### Cómo se ve un equipo
 
 Al tocar un equipo, la tarjeta de arriba muestra sus datos como vienen en la hoja de registro: club,
-categoría, rama, teléfono, entrenador, asistente, director general y en qué días puede jugar. Abajo están sus
-jugadores con número, nombre completo, fecha de nacimiento, CURP, asistencias y si tienen foto.
+categoría, rama, teléfono, entrenador, asistente, director general y en qué días puede jugar. Lo que falta
+dice «Sin dato». Abajo de los datos está el resumen, por ejemplo «23 jugadores · 20 con foto · 18 con CURP», y
+una barra con el porcentaje de jugadores con expediente completo (foto, CURP y número). Ese porcentaje
+también aparece en la lista de equipos.
+
+En la tabla de jugadores:
+
+- La primera columna es su foto en un círculo; si no tiene, sus iniciales.
+- **Avisos:** un ⚠ ámbar si le falta CURP, foto o número, y uno rojo si su año de nacimiento no entra en la
+  categoría (pasa el mouse para ver el motivo). En categorías sin límite de edad no se revisa el año.
+  Marca **Solo incompletos**, junto al buscador, para ver solo a quienes les falta algo.
+- **Número:** haz doble clic en el número para cambiarlo ahí mismo. Si otro jugador del equipo ya lo
+  tiene, el programa no lo guarda y te avisa.
+- **Editar o eliminar:** al elegir un jugador aparecen el lápiz y el bote de basura al final de su
+  renglón; también puedes usar el clic derecho.
 
 Cada vez que guardas algo, la barra verde de abajo lo confirma, por ejemplo «Listo: jugador guardado.».
 
 ### Pase de lista
 
-Cada jugador tiene la columna **Asistencias** (por ejemplo, «3 de 4»: vino a 3 de los 4 partidos en que se
+Cada jugador tiene la columna **Asist.** (asistencias; por ejemplo, «3 de 4»: vino a 3 de los 4 partidos en que se
 pasó lista). Hay tres formas de pasar lista:
 
 - **Por partido, en Resultados:** selecciona el partido y pulsa **Pase de lista**. Sirve para anotar quién
   llegó antes de que termine el partido.
 - **Al capturar el resultado:** junto a los goles de cada jugador está la casilla **¿Quién vino?**. Quien
   anota gol queda marcado solo.
-- **Por equipo, en Equipos y jugadores:** pulsa **Pase de lista**, junto a los botones de jugadores. Verás
+- **Por equipo, en Equipos y jugadores:** pulsa **Pase de lista**, junto a **Agregar jugador**. Verás
   una cuadrícula como la de la hoja de registro: un renglón por jugador y una columna por partido (J1,
   J2…). Haz clic en la celda para marcar «Sí» y otro clic para quitarlo.
 
 ### Otras acciones del equipo
 
-En **Más opciones**, con el equipo seleccionado:
+En **Más**, debajo de la lista de equipos, con el equipo seleccionado:
 
 - **Días y horas en que puede jugar:** si no marcas nada, puede jugar siempre.
 - **Descargar plantilla de Excel vacía**.
@@ -187,9 +208,10 @@ tocar uno ves su ficha, con su promedio de estrellas y los partidos que ha dirig
 
 - **Asignar el árbitro de un partido:** en **Rol de juegos**, selecciona el partido y pulsa **Asignar
   árbitro**. También puedes elegirlo al capturar el resultado.
-- **Calificarlo:** en **Capturar resultado**, debajo de los jugadores, elige al árbitro y toca de 1 a 5
-  estrellas en **¿Cómo arbitró?** (1 Malo, 2 Regular, 3 Bueno, 4 Muy bueno, 5 Excelente). Tocar otra vez
-  la misma estrella quita la calificación. Con el teclado: números del 1 al 5, o las flechas.
+- **Calificarlo:** en **Capturar resultado**, debajo de los jugadores, elige al árbitro. Cada equipo tiene su
+  propia calificación: toca de 1 a 5 estrellas (1 Malo, 2 Regular, 3 Bueno, 4 Muy bueno, 5 Excelente) y, si
+  quieres, escribe una nota o comentario. Tocar otra vez la misma estrella la quita. Con el teclado: números
+  del 1 al 5, o las flechas. El promedio del árbitro junta las calificaciones de todos los equipos.
 - **Si un árbitro ya no trabaja con la liga:** **Eliminar** solo borra a los que no tienen partidos. Si ya
   tiene, el programa ofrece **darlo de baja**: deja de aparecer al asignar, pero se conserva su historial.
 

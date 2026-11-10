@@ -34,7 +34,7 @@ from .comun import (
     llenar,
     tabla,
 )
-from .estrellas import CalificacionArbitro
+from .estrellas import NotaEquipo
 from .filtros import FiltrosLiga
 from .lista import ColumnaEquipo, pasar_lista
 from .tema import ROJO
@@ -49,7 +49,7 @@ class DialogoResultado(QDialog):
     def __init__(self, padre, conn: sqlite3.Connection, partido, local: str, visitante: str):
         super().__init__(padre)
         self.setWindowTitle("Capturar resultado")
-        self.resize(900, 620)
+        self.resize(900, 680)
         self.conn = conn
         self.partido = partido
 
@@ -102,26 +102,34 @@ class DialogoResultado(QDialog):
             fila.addStretch(1)
             raiz.addLayout(fila)
 
-        # El árbitro del partido y cómo lo hizo, de 1 a 5 estrellas.
+        # El árbitro del partido, y lo que cada equipo opina de él (1 a 5 estrellas y un comentario).
         from .pagina_arbitros import combo_arbitros  # aquí, para no crear un ciclo al importar
 
         previo_arbitro = arbitros.de_partido(conn, partido["id"])
-        self._arbitro_previo = previo_arbitro
-        self.arbitro = combo_arbitros(conn, previo_arbitro["id"] if previo_arbitro else None)
-        self.arbitro.setMinimumWidth(220)
-        self.calificacion = CalificacionArbitro((previo_arbitro["calificacion"] or 0) if previo_arbitro else 0)
+        self._arbitro_previo = previo_arbitro["id"] if previo_arbitro else None
+        self._notas_previas = arbitros.notas_de_partido(conn, partido["id"])
+        self.arbitro = combo_arbitros(conn, self._arbitro_previo)
+        self.arbitro.setMinimumWidth(240)
         self.arbitro.currentIndexChanged.connect(self._al_cambiar_arbitro)
-        arbitraje = QHBoxLayout()
-        arbitraje.setSpacing(10)
-        arbitraje.addWidget(etiqueta("Árbitro:", self.arbitro))
-        arbitraje.addWidget(self.arbitro)
-        arbitraje.addSpacing(18)
-        arbitraje.addWidget(QLabel("¿Cómo arbitró?"))
-        arbitraje.addWidget(self.calificacion, 1)
+        fila_arbitro = QHBoxLayout()
+        fila_arbitro.setSpacing(10)
+        fila_arbitro.addWidget(etiqueta("Árbitro:", self.arbitro))
+        fila_arbitro.addWidget(self.arbitro)
         if self.arbitro.count() == 1:
-            arbitraje.addWidget(QLabel("Registra árbitros en la página «Árbitros».", objectName="ayuda"))
-        raiz.addLayout(arbitraje)
-        self.calificacion.setEnabled(self.arbitro.currentData() is not None)
+            fila_arbitro.addWidget(QLabel("Registra árbitros en la página «Árbitros».", objectName="ayuda"))
+        fila_arbitro.addStretch(1)
+        raiz.addLayout(fila_arbitro)
+
+        self.notas = {
+            partido["local_id"]: NotaEquipo(local),
+            partido["visitante_id"]: NotaEquipo(visitante),
+        }
+        notas = QHBoxLayout()
+        notas.setSpacing(16)
+        for nota in self.notas.values():
+            notas.addWidget(nota, 1)
+        raiz.addLayout(notas)
+        self._al_cambiar_arbitro()
 
         raiz.addWidget(
             QLabel(
@@ -140,13 +148,12 @@ class DialogoResultado(QDialog):
         return {**self.local.goles, **self.visitante.goles}
 
     def _al_cambiar_arbitro(self):
-        # La calificación era para el árbitro anterior: con otro se empieza de cero.
-        previo = self._arbitro_previo
-        if previo and self.arbitro.currentData() == previo["id"]:
-            self.calificacion.estrellas.setValor(previo["calificacion"] or 0)
-        else:
-            self.calificacion.estrellas.setValor(0)
-        self.calificacion.setEnabled(self.arbitro.currentData() is not None)
+        # Las calificaciones eran para el árbitro anterior: con otro se empieza de cero.
+        mismo = self.arbitro.currentData() is not None and self.arbitro.currentData() == self._arbitro_previo
+        for equipo_id, nota in self.notas.items():
+            previa = self._notas_previas.get(equipo_id) if mismo else None
+            nota.poner(previa["estrellas"] or 0 if previa else 0, previa["comentario"] if previa else "")
+            nota.setEnabled(self.arbitro.currentData() is not None)
 
     def goleadores(self) -> dict[int, int]:
         return {**self.local.goleadores(), **self.visitante.goleadores()}
@@ -166,10 +173,11 @@ class DialogoResultado(QDialog):
                 self.local.presentes() | self.visitante.presentes() | set(self.goleadores()),
             )
             arbitro_id = self.arbitro.currentData()
-            arbitros.asignar(
-                self.conn, self.partido["id"], arbitro_id,
-                self.calificacion.valor() if arbitro_id is not None else None,
-            )
+            arbitros.asignar(self.conn, self.partido["id"], arbitro_id)
+            if arbitro_id is not None:
+                arbitros.calificar(
+                    self.conn, self.partido["id"], {e: n.valores() for e, n in self.notas.items()}
+                )
         except ValueError as exc:
             self.aviso.mostrar(str(exc))
             return
@@ -271,7 +279,7 @@ def _arbitro(partido) -> str:
     if not partido["arbitro"]:
         return "-"
     if partido["calificacion"]:
-        return f"{partido['arbitro']} ({partido['calificacion']} de 5)"
+        return f"{partido['arbitro']} ({partido['calificacion']:.1f} de 5)"
     return partido["arbitro"]
 
 
@@ -348,7 +356,9 @@ class PaginaResultados(QWidget):
         # Lo más antiguo primero: son los primeros que deberían estar ya capturados.
         filas = self.conn.execute(
             f"""SELECT p.*, l.nombre AS local, v.nombre AS visitante, c.nombre AS categoria,
-                       r.goles_local, r.goles_visitante, a.nombre AS arbitro, x.calificacion
+                       r.goles_local, r.goles_visitante, a.nombre AS arbitro,
+                       (SELECT AVG(n.estrellas) FROM calificaciones_arbitro n WHERE n.partido_id = p.id)
+                           AS calificacion
                 FROM partidos p JOIN equipos l ON l.id = p.local_id
                 JOIN equipos v ON v.id = p.visitante_id JOIN categorias c ON c.id = p.categoria_id
                 LEFT JOIN resultados r ON r.partido_id = p.id

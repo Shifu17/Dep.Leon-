@@ -3,6 +3,7 @@
 import sqlite3
 
 ESTRELLAS_MAX = 5
+COMENTARIO_MAX = 200
 NOMBRE_CALIFICACION = {1: "Malo", 2: "Regular", 3: "Bueno", 4: "Muy bueno", 5: "Excelente"}
 
 
@@ -74,29 +75,17 @@ def para_elegir(conn: sqlite3.Connection, incluir: int | None = None) -> list[sq
 
 def de_partido(conn: sqlite3.Connection, partido_id: int) -> sqlite3.Row | None:
     return conn.execute(
-        """SELECT a.*, x.calificacion FROM arbitrajes x JOIN arbitros a ON a.id = x.arbitro_id
-           WHERE x.partido_id = ?""",
+        """SELECT a.* FROM arbitrajes x JOIN arbitros a ON a.id = x.arbitro_id WHERE x.partido_id = ?""",
         (partido_id,),
     ).fetchone()
 
 
-def asignar(
-    conn: sqlite3.Connection,
-    partido_id: int,
-    arbitro_id: int | None,
-    calificacion: int | None = None,
-    conservar_calificacion: bool = False,
-) -> None:
-    """Pone (o quita, con None) el árbitro del partido y su calificación de 1 a 5 estrellas.
+def asignar(conn: sqlite3.Connection, partido_id: int, arbitro_id: int | None) -> None:
+    """Pone (o quita, con None) el árbitro del partido.
 
-    Con `conservar_calificacion`, si el árbitro no cambia se respeta la calificación que ya tenía;
-    al cambiar de árbitro siempre se pierde, porque era de otra persona.
+    Si cambia de árbitro, se borran las calificaciones de los equipos: eran para otra persona.
     """
-    if calificacion is not None and not 1 <= calificacion <= ESTRELLAS_MAX:
-        raise ValueError(f"La calificación va de 1 a {ESTRELLAS_MAX} estrellas.")
     if arbitro_id is None:
-        if calificacion is not None:
-            raise ValueError("Para calificar, primero elige al árbitro del partido.")
         with conn:
             conn.execute("DELETE FROM arbitrajes WHERE partido_id = ?", (partido_id,))
         return
@@ -104,36 +93,87 @@ def asignar(
         raise ValueError("El partido ya no existe.")
     if conn.execute("SELECT 1 FROM arbitros WHERE id = ?", (arbitro_id,)).fetchone() is None:
         raise ValueError("Ese árbitro ya no está registrado.")
-    previo = conn.execute("SELECT * FROM arbitrajes WHERE partido_id = ?", (partido_id,)).fetchone()
-    if conservar_calificacion and previo and previo["arbitro_id"] == arbitro_id:
-        calificacion = previo["calificacion"]
+    previo = conn.execute("SELECT arbitro_id FROM arbitrajes WHERE partido_id = ?", (partido_id,)).fetchone()
     with conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO arbitrajes (partido_id, arbitro_id, calificacion) VALUES (?, ?, ?)",
-            (partido_id, arbitro_id, calificacion),
-        )
+        if previo is None:
+            conn.execute("INSERT INTO arbitrajes (partido_id, arbitro_id) VALUES (?, ?)", (partido_id, arbitro_id))
+        elif previo["arbitro_id"] != arbitro_id:
+            conn.execute("DELETE FROM calificaciones_arbitro WHERE partido_id = ?", (partido_id,))
+            conn.execute("UPDATE arbitrajes SET arbitro_id = ? WHERE partido_id = ?", (arbitro_id, partido_id))
+
+
+def calificar(
+    conn: sqlite3.Connection, partido_id: int, notas: dict[int, tuple[int | None, str]]
+) -> None:
+    """Guarda lo que cada equipo opina del árbitro: {equipo_id: (estrellas o None, comentario)}.
+
+    Sin estrellas ni comentario, la opinión de ese equipo se borra.
+    """
+    if not notas:
+        return
+    partido = conn.execute("SELECT local_id, visitante_id FROM partidos WHERE id = ?", (partido_id,)).fetchone()
+    if partido is None:
+        raise ValueError("El partido ya no existe.")
+    if de_partido(conn, partido_id) is None:
+        raise ValueError("Para calificar, primero elige al árbitro del partido.")
+    for equipo_id, (estrellas, comentario) in notas.items():
+        if equipo_id not in (partido["local_id"], partido["visitante_id"]):
+            raise ValueError("Solo califican los dos equipos del partido.")
+        if estrellas is not None and not 1 <= estrellas <= ESTRELLAS_MAX:
+            raise ValueError(f"La calificación va de 1 a {ESTRELLAS_MAX} estrellas.")
+        if len(comentario.strip()) > COMENTARIO_MAX:
+            raise ValueError(f"El comentario no puede pasar de {COMENTARIO_MAX} letras.")
+    with conn:
+        for equipo_id, (estrellas, comentario) in notas.items():
+            comentario = " ".join(comentario.split())
+            if estrellas is None and not comentario:
+                conn.execute(
+                    "DELETE FROM calificaciones_arbitro WHERE partido_id = ? AND equipo_id = ?",
+                    (partido_id, equipo_id),
+                )
+            else:
+                conn.execute(
+                    "INSERT OR REPLACE INTO calificaciones_arbitro (partido_id, equipo_id, estrellas, comentario) "
+                    "VALUES (?, ?, ?, ?)",
+                    (partido_id, equipo_id, estrellas, comentario),
+                )
+
+
+def notas_de_partido(conn: sqlite3.Connection, partido_id: int) -> dict[int, sqlite3.Row]:
+    """La calificación y el comentario de cada equipo, por id de equipo."""
+    return {
+        f["equipo_id"]: f
+        for f in conn.execute("SELECT * FROM calificaciones_arbitro WHERE partido_id = ?", (partido_id,))
+    }
 
 
 def resumen(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    """Cada árbitro con sus partidos, cuántos se calificaron y su promedio de estrellas."""
+    """Cada árbitro con sus partidos, cuántas calificaciones le dieron los equipos y su promedio."""
     return conn.execute(
-        """SELECT a.*, COUNT(x.partido_id) AS partidos, COUNT(x.calificacion) AS calificados,
-                  AVG(x.calificacion) AS promedio
-           FROM arbitros a LEFT JOIN arbitrajes x ON x.arbitro_id = a.id
+        """SELECT a.*,
+                  (SELECT COUNT(*) FROM arbitrajes x WHERE x.arbitro_id = a.id) AS partidos,
+                  COUNT(n.estrellas) AS calificados, AVG(n.estrellas) AS promedio
+           FROM arbitros a
+           LEFT JOIN arbitrajes x ON x.arbitro_id = a.id
+           LEFT JOIN calificaciones_arbitro n ON n.partido_id = x.partido_id
            GROUP BY a.id ORDER BY a.activo DESC, a.nombre COLLATE ES"""
     ).fetchall()
 
 
 def historial(conn: sqlite3.Connection, arbitro_id: int) -> list[sqlite3.Row]:
-    """Los partidos del árbitro, del más reciente al más antiguo, con marcador y calificación."""
+    """Lo que opinó cada equipo de cada partido del árbitro, del más reciente al más antiguo.
+
+    Un partido sin opiniones aparece una vez, con el equipo vacío.
+    """
     return conn.execute(
-        """SELECT p.*, l.nombre AS local, v.nombre AS visitante, c.nombre AS categoria,
-                  r.goles_local, r.goles_visitante, x.calificacion
+        """SELECT p.id AS partido_id, p.fecha, p.estado, l.nombre AS local, v.nombre AS visitante,
+                  r.goles_local, r.goles_visitante, e.nombre AS equipo, n.equipo_id, n.estrellas, n.comentario
            FROM arbitrajes x JOIN partidos p ON p.id = x.partido_id
            JOIN equipos l ON l.id = p.local_id JOIN equipos v ON v.id = p.visitante_id
-           JOIN categorias c ON c.id = p.categoria_id
            LEFT JOIN resultados r ON r.partido_id = p.id
+           LEFT JOIN calificaciones_arbitro n ON n.partido_id = p.id
+           LEFT JOIN equipos e ON e.id = n.equipo_id
            WHERE x.arbitro_id = ?
-           ORDER BY p.fecha IS NULL, p.fecha DESC, p.hora DESC""",
+           ORDER BY p.fecha IS NULL, p.fecha DESC, p.hora DESC, p.id, n.equipo_id = p.visitante_id""",
         (arbitro_id,),
     ).fetchall()

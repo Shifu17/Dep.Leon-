@@ -87,7 +87,11 @@ def preparar(conn):
             plantel = [j["id"] for j in conn.execute("SELECT id FROM jugadores WHERE equipo_id = ?", (equipo,))]
             vinieron |= set(azar.sample(plantel, azar.randint(3, len(plantel))))
         asistencia.guardar(conn, p["id"], vinieron)
-        arbitros.asignar(conn, p["id"], azar.choice(silbantes), azar.choice([3, 4, 4, 5, 5]))
+        arbitros.asignar(conn, p["id"], azar.choice(silbantes))
+        notas = ["", "", "Buen control del partido", "Llegó tarde", "Se le escaparon faltas"]
+        arbitros.calificar(conn, p["id"], {
+            e: (azar.choice([3, 4, 4, 5, 5]), azar.choice(notas)) for e in (p["local_id"], p["visitante_id"])
+        })
 
     aguilas = conn.execute(
         "SELECT id FROM equipos WHERE nombre = 'Águilas' AND categoria_id = ?", (ids[0],)
@@ -162,6 +166,8 @@ def main():
         app.processEvents()
         tabla = ventana.equipos.tabla_equipos
         tabla.selectRow(next(f for f in range(tabla.rowCount()) if tabla.item(f, 0).text() == "Águilas"))
+        app.processEvents()
+        ventana.equipos.tabla_jugadores.selectRow(1)  # se ven los iconos de editar y eliminar
 
     capturar("Equipos y jugadores", "equipos.png", equipo_con_lista)
     capturar("Árbitros", "arbitros.png")

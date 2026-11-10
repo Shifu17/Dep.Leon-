@@ -80,6 +80,17 @@ QLabel#datoAlerta {{ color: {ROJO}; font-size: {_t(22)}; font-weight: 600; }}
 QLabel#datoTexto {{ color: {TEXTO_SUAVE}; }}
 QLabel#datoTitulo {{ color: {TEXTO_SUAVE}; font-size: {_t(12)}; }}
 QLabel#datoValor {{ color: {TEXTO}; font-weight: 600; }}
+QLabel#datoVacio {{ color: {TEXTO_SUAVE}; font-style: italic; }}
+QProgressBar#avance {{
+    background: {CAMPO_DESACTIVADO}; border: none; border-radius: 4px; max-height: 8px; min-height: 8px;
+}}
+QProgressBar#avance::chunk {{ background: {VERDE}; border-radius: 4px; }}
+QPushButton#icono, QPushButton#iconoPeligro {{
+    background: {BLANCO}; border: 1px solid {BORDE}; border-radius: 8px; padding: 0; min-height: 0;
+}}
+QPushButton#icono:hover {{ background: {VERDE_SUAVE}; border-color: {VERDE}; }}
+QPushButton#iconoPeligro:hover {{ background: {ROJO_SUAVE}; border-color: {BORDE_PELIGRO}; }}
+QPushButton#icono:focus, QPushButton#iconoPeligro:focus {{ border: 2px solid {BARRA}; }}
 QFrame#pendiente {{ background: {BLANCO}; border: 1px solid {CUADRICULA}; border-radius: 10px; }}
 QFrame#pendienteAlerta {{ background: {ROJO_SUAVE}; border: 1px solid {BORDE_PELIGRO}; border-radius: 10px; }}
 QLabel#vacio {{ color: {TEXTO_SUAVE}; background: transparent; }}

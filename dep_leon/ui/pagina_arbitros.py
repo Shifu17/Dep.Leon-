@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from .. import arbitros, rol
 from ..jugadores import borrar_foto, guardar_foto
 from ..paths import fotos_dir
-from . import diseno
+from . import campos, diseno
 from .comun import (
     al_activar,
     boton,
@@ -39,7 +39,8 @@ from .comun import (
     poner_vacio,
     tabla,
 )
-from .estrellas import avatar, pixmap_estrellas
+from .avatar import avatar
+from .estrellas import pixmap_estrellas
 
 TAMANO_FOTO = QSize(120, 150)
 
@@ -59,7 +60,8 @@ class DialogoArbitro(QDialog):
         self.ruta_foto: Path | None = None
         self.nombre = QLineEdit(arbitro["nombre"] if arbitro else "")
         self.telefono = QLineEdit(arbitro["telefono"] if arbitro else "")
-        self.telefono.setPlaceholderText("Opcional")
+        campos.solo_nombre(self.nombre, "Nombre y apellidos")
+        campos.solo_telefono(self.telefono)
         self.activo = QCheckBox("Disponible para asignarle partidos")
         self.activo.setChecked(bool(arbitro["activo"]) if arbitro else True)
         self.vista_foto = QLabel("Sin foto", objectName="marcoFoto", alignment=Qt.AlignmentFlag.AlignCenter)
@@ -69,7 +71,7 @@ class DialogoArbitro(QDialog):
 
         forma = QFormLayout(self)
         self.error_nombre = fila_con_error(forma, "Nombre completo:", self.nombre)
-        forma.addRow("Teléfono:", self.telefono)
+        self.error_telefono = fila_con_error(forma, "Teléfono:", self.telefono)
         forma.addRow("", self.activo)
         forma.addRow("Foto:", self.vista_foto)
         forma.addRow("", boton("Elegir foto...", self._elegir_foto, "secundario", icono="imagen"))
@@ -98,6 +100,10 @@ class DialogoArbitro(QDialog):
     def _aceptar(self):
         if not self.nombre.text().strip():
             self.error_nombre.mostrar("Escribe el nombre del árbitro.")
+            return
+        motivo = campos.error_telefono(self.telefono.text())
+        if motivo:
+            self.error_telefono.mostrar(motivo)
             return
         self.accept()
 
@@ -141,7 +147,7 @@ def asignar_arbitro(padre: QWidget, conn: sqlite3.Connection, partido_id: int) -
     if not dialogo.exec():
         return False
     try:
-        arbitros.asignar(conn, partido_id, dialogo.arbitro.currentData(), conservar_calificacion=True)
+        arbitros.asignar(conn, partido_id, dialogo.arbitro.currentData())
     except ValueError as exc:
         error(padre, str(exc))
         return False
@@ -238,7 +244,7 @@ class PaginaArbitros(QWidget):
         self.busqueda = campo_busqueda(self.tabla, "Buscar árbitro")
 
         self.ficha = FichaArbitro()
-        self.partidos = tabla(["Fecha", "Partido", "Marcador", "Categoría", "Calificación"], estirar=1)
+        self.partidos = tabla(["Fecha", "Partido", "Calificó", "Calificación", "Comentario"], estirar=4)
         self.partidos.setIconSize(QSize(68, 12))
         poner_vacio(self.partidos, "Este árbitro todavía no tiene partidos. Se le asignan en «Rol de juegos» "
                                    "o al capturar el resultado.")
@@ -302,30 +308,39 @@ class PaginaArbitros(QWidget):
         arbitro_id = id_seleccionado(self.tabla)
         self.ficha.mostrar(self._filas.get(arbitro_id))
         filas = arbitros.historial(self.conn, arbitro_id) if arbitro_id is not None else []
+
+        def calificacion(p) -> str:
+            if p["estrellas"]:
+                return f"{p['estrellas']} de 5"
+            if p["equipo"]:
+                return "Sin estrellas"
+            return "Sin calificar" if p["estado"] in (rol.JUGADO, rol.DEFAULT) else "Por jugar"
+
+        # Un renglón por cada equipo que calificó; la clave une partido y equipo.
+        renglones = {f"{p['partido_id']}-{p['equipo_id']}": p for p in filas}
         llenar(
             self.partidos,
             [
                 (
-                    p["id"],
+                    clave,
                     [
                         date.fromisoformat(p["fecha"]).strftime("%d/%m/%Y") if p["fecha"] else "Sin fecha",
-                        f"{p['local']} vs {p['visitante']}",
-                        f"{p['goles_local']} - {p['goles_visitante']}" if p["goles_local"] is not None else "-",
-                        p["categoria"],
-                        f"{p['calificacion']} de 5" if p["calificacion"]
-                        else "Sin calificar" if p["estado"] in (rol.JUGADO, rol.DEFAULT) else "Por jugar",
+                        f"{p['local']} {p['goles_local']}-{p['goles_visitante']} {p['visitante']}"
+                        if p["goles_local"] is not None else f"{p['local']} vs {p['visitante']}",
+                        p["equipo"] or "-",
+                        calificacion(p),
+                        p["comentario"] or "",
                     ],
                 )
-                for p in filas
+                for clave, p in renglones.items()
             ],
         )
-        calificaciones = {p["id"]: p["calificacion"] for p in filas}
         for r in range(self.partidos.rowCount()):
-            estrellas = calificaciones[self.partidos.item(r, 0).data(Qt.ItemDataRole.UserRole)]
-            if estrellas:
-                celda = self.partidos.item(r, 4)
-                celda.setIcon(QIcon(pixmap_estrellas(estrellas, 12)))
-                celda.setToolTip(arbitros.texto_calificacion(estrellas))
+            p = renglones[self.partidos.item(r, 0).data(Qt.ItemDataRole.UserRole)]
+            if p["estrellas"]:
+                celda = self.partidos.item(r, 3)
+                celda.setIcon(QIcon(pixmap_estrellas(p["estrellas"], 12)))
+                celda.setToolTip(arbitros.texto_calificacion(p["estrellas"]))
 
     def _arbitro(self):
         arbitro_id = id_seleccionado(self.tabla)
