@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFrame,
-    QHBoxLayout,
     QLabel,
     QPushButton,
     QScrollArea,
@@ -20,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import lienzo, reportes
+from . import diseno
 from .comun import ayuda_pagina, boton, error, etiqueta, info
 from .filtros import FiltrosLiga
 
@@ -52,7 +52,7 @@ class PaginaReportes(QWidget):
         self.boton_imagen = boton("Guardar imagen", self.guardar_imagen, "secundario")
         self.boton_copiar: QPushButton = boton("Copiar imagen", self.copiar_imagen, "secundario")
 
-        fila = QHBoxLayout()
+        fila = diseno.FilaBotones()
         fila.addWidget(etiqueta("Reporte:", self.reporte))
         fila.addWidget(self.reporte)
         fila.addWidget(self.etiqueta_fecha)

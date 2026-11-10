@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import cobros, recibos
+from . import diseno
 from .comun import (
     ayuda_pagina,
     al_activar,
@@ -47,6 +48,7 @@ class Tarjeta(QFrame):
 
     def __init__(self, texto: str):
         super().__init__(objectName="tarjeta")
+        diseno.sombra(self)
         self.numero = QLabel("0", objectName="tarjetaNumero")
         columna = QVBoxLayout(self)
         columna.setContentsMargins(16, 10, 16, 10)

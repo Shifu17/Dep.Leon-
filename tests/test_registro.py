@@ -405,3 +405,37 @@ def test_confirmacion_en_la_barra_inferior(app):
     listo(contenido, "jugador guardado.")
     assert ventana.statusBar().currentMessage() == "Listo: jugador guardado."
     listo(QLabel("suelta"), "sin ventana principal")  # no falla fuera de la ventana principal
+
+
+def test_agregar_y_editar_equipo_a_mano_con_todos_sus_datos(app, conn, torneo_id, monkeypatch):
+    """Agregar un equipo a mano fallaba en la 0.9.7: faltaban lugares en el INSERT."""
+    from dep_leon.ui import pagina_equipos as ui
+
+    pagina = ui.PaginaEquipos(conn)
+    liga = conn.execute("SELECT liga_id FROM torneos WHERE id = ?", (torneo_id,)).fetchone()[0]
+    pagina.filtros.aplicar(liga, torneo_id, None)
+
+    def llenar(dialogo):
+        dialogo.nombre.setText("Halcones")
+        dialogo.rama.setCurrentIndex(dialogo.rama.findData("FEMENIL"))
+        dialogo.responsable.setText("Entrenadora A")
+        dialogo.asistente.setText("Asistente B")
+        dialogo.director.setText("Directora C")
+        return 1
+
+    monkeypatch.setattr(ui.DialogoEquipo, "exec", llenar)
+    pagina.nuevo_equipo()
+    equipo = conn.execute("SELECT * FROM equipos WHERE nombre = 'Halcones'").fetchone()
+    assert (equipo["rama"], equipo["responsable"], equipo["asistente"], equipo["director"]) == (
+        "FEMENIL", "Entrenadora A", "Asistente B", "Directora C"
+    )
+    assert pagina.datos_equipo.valores["rama"].text() == "Femenil"  # el primer equipo queda elegido
+
+    def cambiar(dialogo):
+        dialogo.director.setText("Otra directora")
+        return 1
+
+    monkeypatch.setattr(ui.DialogoEquipo, "exec", cambiar)
+    pagina.editar_equipo()
+    assert conn.execute("SELECT director FROM equipos WHERE id = ?", (equipo["id"],)).fetchone()[0] == "Otra directora"
+    assert pagina.datos_equipo.valores["director"].text() == "Otra directora"

@@ -32,9 +32,17 @@ GRIS_CORTE = HexColor("#B8B8B8")
 CIUDAD = "SALTILLO, COAHUILA"
 
 
+RAMAS = ["VARONIL", "FEMENIL", "MIXTA"]
+
+
 def rama(texto: str) -> str:
     """FEMENIL si la liga o la categoría lo dicen; si no, VARONIL."""
     return "FEMENIL" if "femenil" in texto.casefold() else "VARONIL"
+
+
+def rama_de(equipo) -> str:
+    """La rama guardada del equipo; si no tiene, la que sugieren su liga y su categoría."""
+    return equipo["rama"] or rama(f"{equipo['liga']} {equipo['categoria']}")
 
 
 def generar(conn: sqlite3.Connection, equipo_id: int, destino: Path | str, fotos_dir: Path) -> int:
@@ -165,7 +173,7 @@ def _dibujar(pdf: canvas.Canvas, x: float, y: float, jugador, equipo, fotos_dir:
     pdf.setFillColor(AMARILLO)
     pdf.rect(ax, ay, aa, ah, fill=1, stroke=0)
     _texto(pdf, (ax, ay, aa, ah), "JUGADOR", "Helvetica-Bold", 9)
-    _texto(pdf, r.caja(1, 9, 2, 9), rama(f"{equipo['liga']} {equipo['categoria']}"), "Helvetica-Bold", 9)
+    _texto(pdf, r.caja(1, 9, 2, 9), rama_de(equipo), "Helvetica-Bold", 9)
     numero = "" if jugador["numero"] is None else str(jugador["numero"])
     _texto(pdf, r.caja(3, 9), numero, "Helvetica-Bold", 10)
 

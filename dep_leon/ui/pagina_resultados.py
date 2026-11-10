@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import asistencia, liguilla, resultados, rol
+from . import diseno
 from .comun import (
     ayuda_pagina,
     AvisoCampo,
@@ -253,7 +254,7 @@ class PaginaResultados(QWidget):
         filtros.addWidget(etiqueta("Ver:", self.ver))
         filtros.addWidget(self.ver, 1)
 
-        acciones = QHBoxLayout()
+        acciones = diseno.FilaBotones()
         for texto, accion, estilo, ayuda in (
             ("Capturar resultado", self.capturar, None, "Anota el marcador, quién vino y quién anotó."),
             ("Pase de lista", self.pase_de_lista, "secundario", "Anota quién llegó, aunque el partido no termine."),

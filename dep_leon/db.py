@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS equipos (
     telefono TEXT NOT NULL DEFAULT '',
     asistente TEXT NOT NULL DEFAULT '',
     director TEXT NOT NULL DEFAULT '',
+    rama TEXT NOT NULL DEFAULT '',
     UNIQUE (torneo_id, categoria_id, nombre)
 );
 CREATE TABLE IF NOT EXISTS jugadores (
@@ -222,7 +223,7 @@ def _migrar(conn: sqlite3.Connection) -> None:
     """Pone al día una base de una versión anterior sin perder datos."""
     # Hasta la 0.9.6 el equipo solo guardaba un responsable; la hoja de registro trae más personal.
     del_equipo = {c["name"] for c in conn.execute("PRAGMA table_info(equipos)")}
-    for columna in ("asistente", "director"):
+    for columna in ("asistente", "director", "rama"):
         if columna not in del_equipo:
             with conn:
                 conn.execute(f"ALTER TABLE equipos ADD COLUMN {columna} TEXT NOT NULL DEFAULT ''")

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import cobros, estadisticas, inicio, rol
+from . import diseno
 from .comun import boton, etiqueta, llenar, tabla
 
 
@@ -58,6 +59,7 @@ class Pendiente(QFrame):
 
     def __init__(self, texto_boton: str, accion, alerta: bool = False):
         super().__init__(objectName="pendienteAlerta" if alerta else "pendiente")
+        diseno.sombra(self)
         self.texto = QLabel(wordWrap=True)
         fila = QHBoxLayout(self)
         fila.setContentsMargins(12, 6, 8, 6)
@@ -96,6 +98,7 @@ class PaginaInicio(QWidget):
         self.jugados = Dato("Jugados")
         self.pospuestos = Dato("Pospuestos")
         franja = QFrame(objectName="franja")
+        diseno.sombra(franja)
         fila_franja = QHBoxLayout(franja)
         fila_franja.setContentsMargins(4, 0, 4, 0)
         fila_franja.setSpacing(0)

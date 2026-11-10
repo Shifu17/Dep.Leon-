@@ -218,7 +218,7 @@ def test_pagina_equipos_edita_y_muestra_disponibilidad(ventana, conn, torneo_id,
     pagina = ventana.equipos
     pagina.refrescar()
     pagina.tabla_equipos.selectRow(0)
-    assert pagina.tabla_equipos.item(0, 3).text() == "Siempre"
+    assert pagina.datos_equipo.valores["disponible"].text() == "Siempre"
 
     def elegir(dialogo):
         dialogo.siempre.setChecked(False)
@@ -228,7 +228,7 @@ def test_pagina_equipos_edita_y_muestra_disponibilidad(ventana, conn, torneo_id,
     monkeypatch.setattr(ui_equipos.DialogoDisponibilidad, "exec", elegir)
     pagina.editar_disponibilidad()
     assert rol.disponibilidad_de_equipo(conn, a) == {SAB: (480, 1320)}
-    assert pagina.tabla_equipos.item(0, 3).text() == "Sáb"
+    assert pagina.datos_equipo.valores["disponible"].text() == "Sáb"
 
 
 def test_formulario_de_partido_avisa_y_permite_guardar_de_todos_modos(ventana, conn, torneo_id, categoria, monkeypatch):

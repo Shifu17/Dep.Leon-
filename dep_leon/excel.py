@@ -405,7 +405,7 @@ def _registrar(
     `personal` trae responsable (entrenador), asistente y director: lo que venga lleno actualiza al equipo.
     """
     personal = {k: v for k, v in (personal or {}).items() if v}
-    assert set(personal) <= {"responsable", "asistente", "director"}  # nombres de columna fijos
+    assert set(personal) <= {"responsable", "asistente", "director", "rama"}  # nombres de columna fijos
     nuevos = actualizados = equipos_creados = 0
     actualizados_personal: set = set()
     equipos = {

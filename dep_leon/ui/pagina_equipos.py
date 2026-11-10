@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -31,8 +32,8 @@ from .. import asistencia, cobros, colores, credenciales, excel, registro, rol
 from ..db import clave_orden
 from ..jugadores import NUMERO_MAX, POSICIONES, borrar_foto, error_de_edad, guardar_foto
 from ..paths import fotos_dir
+from . import diseno
 from .comun import (
-    ayuda_pagina,
     AvisoCampo,
     al_activar,
     boton,
@@ -66,11 +67,17 @@ class DialogoEquipo(QDialog):
         self.asistente = QLineEdit(equipo["asistente"] if equipo else "")
         self.director = QLineEdit(equipo["director"] if equipo else "")
         self.telefono = QLineEdit(equipo["telefono"] if equipo else "")
+        self.rama = QComboBox()
+        self.rama.addItem("Sin indicar", "")
+        for rama in credenciales.RAMAS:
+            self.rama.addItem(rama.capitalize(), rama)
         if equipo:
             self.categoria.setCurrentIndex(self.categoria.findData(equipo["categoria_id"]))
+            self.rama.setCurrentIndex(max(0, self.rama.findData(equipo["rama"])))
         forma = QFormLayout(self)
         forma.addRow("Categoría:", self.categoria)
-        self.error_nombre = fila_con_error(forma, "Nombre:", self.nombre)
+        self.error_nombre = fila_con_error(forma, "Nombre del club:", self.nombre)
+        forma.addRow("Rama:", self.rama)
         forma.addRow("Entrenador:", self.responsable)
         forma.addRow("Asistente:", self.asistente)
         forma.addRow("Director general:", self.director)
@@ -508,6 +515,59 @@ class DialogoListaEquipo(QDialog):
         self.accept()
 
 
+class DatosEquipo(QFrame):
+    """Los datos del equipo como vienen en la hoja de registro, cada uno en su lugar."""
+
+    CAMPOS = [
+        ("club", "Club"), ("categoria", "Categoría"), ("rama", "Rama"), ("telefono", "Teléfono"),
+        ("responsable", "Entrenador"), ("asistente", "Asistente"), ("director", "Director general"),
+        ("disponible", "Puede jugar"),
+    ]
+
+    def __init__(self):
+        super().__init__(objectName="tarjeta")
+        diseno.sombra(self)
+        rejilla = QGridLayout(self)
+        rejilla.setContentsMargins(16, 12, 16, 12)
+        rejilla.setHorizontalSpacing(18)
+        rejilla.setVerticalSpacing(8)
+        self.valores: dict[str, QLabel] = {}
+        for i, (clave, titulo) in enumerate(self.CAMPOS):
+            caja = QVBoxLayout()
+            caja.setSpacing(0)
+            caja.addWidget(QLabel(titulo, objectName="datoTitulo"))
+            valor = QLabel("-", objectName="datoValor")
+            valor.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            valor.setAccessibleName(titulo)
+            caja.addWidget(valor)
+            self.valores[clave] = valor
+            rejilla.addLayout(caja, i // 4, i % 4)
+        for c in range(4):
+            rejilla.setColumnStretch(c, 1)
+
+    def mostrar(self, conn, equipo_id):
+        equipo = None
+        if equipo_id is not None:
+            equipo = conn.execute(
+                """SELECT e.*, c.nombre AS categoria FROM equipos e JOIN categorias c ON c.id = e.categoria_id
+                   WHERE e.id = ?""",
+                (equipo_id,),
+            ).fetchone()
+        for clave, valor in self.valores.items():
+            if equipo is None:
+                texto = "-"
+            elif clave == "club":
+                texto = equipo["nombre"]
+            elif clave == "disponible":
+                texto = rol.resumen_disponibilidad(rol.disponibilidad_de_equipo(conn, equipo_id))
+            elif clave == "rama":
+                texto = equipo["rama"].capitalize()
+            else:
+                texto = equipo[clave]
+            valor.setText(texto or "-")
+            valor.setToolTip(texto or "")
+
+
 class PaginaEquipos(QWidget):
     datos_cambiados = Signal()
 
@@ -520,7 +580,7 @@ class PaginaEquipos(QWidget):
         self.liga, self.torneo, self.categoria = self.filtros.liga, self.filtros.torneo, self.filtros.categoria
         self.filtros.cambiado.connect(self.refrescar_equipos)
 
-        excel_fila = QHBoxLayout()
+        excel_fila = diseno.FilaBotones()
         importar = boton("Importar Excel", self.importar_excel, "secundario")
         importar.setToolTip("Registra equipos y jugadores desde las hojas de registro de los clubes, con sus fotos.")
         exportar = boton_mas(
@@ -530,6 +590,7 @@ class PaginaEquipos(QWidget):
                 ("Todos los equipos de la lista (un archivo por equipo)", self.exportar_todos),
             ],
         )
+        exportar.setIcon(diseno.icono("exportar", colores.VERDE_ACTIVO, aire=6))
         exportar.setToolTip("Guarda la hoja de registro con el mismo formato de los clubes: jugadores, "
                             "pase de lista y credenciales con foto.")
         credenciales_pdf = boton("Credenciales PDF", self.generar_credenciales, "secundario")
@@ -537,11 +598,10 @@ class PaginaEquipos(QWidget):
         excel_fila.addWidget(importar)
         excel_fila.addWidget(exportar)
         excel_fila.addWidget(credenciales_pdf)
-        excel_fila.addStretch(1)
 
-        self.tabla_equipos = tabla(["Equipo", "Categoría", "Jugadores", "Puede jugar"], estirar=0)
+        self.tabla_equipos = tabla(["Equipo", "Categoría", "Rama", "Jugadores"], estirar=0)
         self.tabla_jugadores = tabla(
-            ["Núm.", "Jugador", "Nacimiento", "Posición", "Asistencias", "Foto"], estirar=1
+            ["Núm.", "Nombre completo", "Nacimiento", "CURP", "Asistencias", "Foto"], estirar=1
         )
         self.tabla_equipos.itemSelectionChanged.connect(self.refrescar_jugadores)
         al_activar(self.tabla_equipos, self.editar_equipo)
@@ -554,9 +614,8 @@ class PaginaEquipos(QWidget):
         izquierda = QVBoxLayout()
         izquierda.addWidget(QLabel("Equipos", objectName="seccion"))
         izquierda.addWidget(self.tabla_equipos)
-        fila = QHBoxLayout()
-        fila.addWidget(boton("Agregar equipo", self.nuevo_equipo))
-        fila.addWidget(boton("Editar", self.editar_equipo, "secundario"))
+        fila = diseno.FilaBotones()
+        fila.addWidget(boton("Editar equipo", self.editar_equipo, "secundario"))
         fila.addWidget(
             boton_mas(
                 "Más opciones",
@@ -567,34 +626,38 @@ class PaginaEquipos(QWidget):
                 ],
             )
         )
-        fila.addStretch(1)
         izquierda.addLayout(fila)
 
+        self.datos_equipo = DatosEquipo()
         derecha = QVBoxLayout()
-        derecha.addWidget(QLabel("Jugadores del equipo", objectName="seccion"))
-        derecha.addWidget(self.tabla_jugadores)
-        fila = QHBoxLayout()
+        derecha.addWidget(self.datos_equipo)
+        derecha.addSpacing(6)
+        derecha.addWidget(QLabel("Jugadores", objectName="seccion"))
+        derecha.addWidget(self.tabla_jugadores, 1)
+        fila = diseno.FilaBotones()
         fila.addWidget(boton("Agregar jugador", self.nuevo_jugador))
         fila.addWidget(boton("Editar", self.editar_jugador, "secundario"))
         fila.addWidget(boton("Eliminar", self.borrar_jugador, "peligro"))
         lista = boton("Pase de lista", self.pase_de_lista, "secundario")
         lista.setToolTip("Asistencia de los jugadores del equipo en cada partido (J1, J2...).")
         fila.addWidget(lista)
-        fila.addStretch(1)
         derecha.addLayout(fila)
 
         columnas = QHBoxLayout()
-        columnas.addLayout(izquierda, 2)
-        columnas.addLayout(derecha, 3)
+        columnas.setSpacing(14)
+        columnas.addLayout(izquierda, 1)
+        columnas.addLayout(derecha, 2)
 
         raiz = QVBoxLayout(self)
-        raiz.addWidget(QLabel("Equipos y jugadores", objectName="titulo"))
-        raiz.addWidget(ayuda_pagina(
-            "Toca un equipo para ver sus jugadores. Para registrar equipos completos de una vez, pulsa «Importar Excel» y elige las hojas de registro de los clubes."
+        raiz.addWidget(diseno.encabezado(
+            "Equipos y jugadores",
+            "Toca un equipo para ver sus datos y sus jugadores. Para registrar equipos completos de una vez, "
+            "pulsa «Importar Excel» y elige las hojas de registro de los clubes.",
+            [boton("Agregar equipo", self.nuevo_equipo)],
         ))
         raiz.addWidget(self.filtros)
         raiz.addLayout(excel_fila)
-        raiz.addLayout(columnas)
+        raiz.addLayout(columnas, 1)
         self.refrescar()
 
     def _torneo_id(self):
@@ -646,7 +709,7 @@ class PaginaEquipos(QWidget):
 
     def refrescar_equipos(self):
         filas = self.conn.execute(
-            """SELECT e.id, e.nombre, c.nombre AS categoria, COUNT(j.id) AS total
+            """SELECT e.id, e.nombre, e.rama, c.nombre AS categoria, COUNT(j.id) AS total
                FROM equipos e JOIN categorias c ON c.id = e.categoria_id
                LEFT JOIN jugadores j ON j.equipo_id = e.id
                WHERE e.torneo_id = ? AND (? IS NULL OR e.categoria_id = ?)
@@ -659,8 +722,7 @@ class PaginaEquipos(QWidget):
                 (
                     f["id"],
                     [
-                        f["nombre"], f["categoria"], f["total"],
-                        rol.resumen_disponibilidad(rol.disponibilidad_de_equipo(self.conn, f["id"])),
+                        f["nombre"], f["categoria"], f["rama"].capitalize() or "-", f["total"],
                     ],
                 )
                 for f in filas
@@ -668,7 +730,7 @@ class PaginaEquipos(QWidget):
         )
         poner_vacio(
             self.tabla_equipos,
-            "No hay equipos en este torneo. Pulsa «Agregar» o importa jugadores desde «Excel»."
+            "No hay equipos en este torneo. Pulsa «Agregar equipo» o «Importar Excel»."
             if self._torneo_id()
             else "Primero crea un torneo en «Ligas y categorías».",
         )
@@ -683,6 +745,7 @@ class PaginaEquipos(QWidget):
 
     def refrescar_jugadores(self):
         equipo_id = id_seleccionado(self.tabla_equipos)
+        self.datos_equipo.mostrar(self.conn, equipo_id)
         filas = self.conn.execute(
             "SELECT * FROM jugadores WHERE equipo_id = ? ORDER BY numero IS NULL, numero, nombre COLLATE ES",
             (equipo_id,),
@@ -698,7 +761,7 @@ class PaginaEquipos(QWidget):
                     [
                         j["numero"], j["nombre"],
                         date.fromisoformat(j["fecha_nacimiento"]).strftime("%d/%m/%Y"),
-                        j["posicion"],
+                        j["curp"] or "-",
                         f"{asistencias.get(j['id'], 0)} de {con_lista}" if con_lista else "-",
                         "Sí" if j["foto"] else "No",
                     ],
@@ -730,8 +793,8 @@ class PaginaEquipos(QWidget):
         dialogo = DialogoEquipo(self, categorias)
         if dialogo.exec():
             self._guardar_equipo(
-                "INSERT INTO equipos (categoria_id, nombre, responsable, telefono, asistente, director, torneo_id) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO equipos (categoria_id, nombre, responsable, telefono, asistente, director, rama, "
+                "torneo_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 dialogo, self._torneo_id(),
             )
 
@@ -748,7 +811,7 @@ class PaginaEquipos(QWidget):
                 return
             self._guardar_equipo(
                 "UPDATE equipos SET categoria_id = ?, nombre = ?, responsable = ?, telefono = ?, "
-                "asistente = ?, director = ? "
+                "asistente = ?, director = ?, rama = ? "
                 "WHERE id = ?",
                 dialogo, equipo_id,
             )
@@ -761,7 +824,8 @@ class PaginaEquipos(QWidget):
                     (
                         dialogo.categoria.currentData(), dialogo.nombre.text().strip(),
                         dialogo.responsable.text().strip(), dialogo.telefono.text().strip(),
-                        dialogo.asistente.text().strip(), dialogo.director.text().strip(), ultimo,
+                        dialogo.asistente.text().strip(), dialogo.director.text().strip(),
+                        dialogo.rama.currentData(), ultimo,
                     ),
                 )
         except sqlite3.IntegrityError:

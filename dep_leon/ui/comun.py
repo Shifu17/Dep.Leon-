@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from . import diseno
 from ..db import clave_orden
 from ..paths import asset
 
@@ -198,12 +199,17 @@ def actualizar_vacio(tabla_: QTableWidget) -> None:
     tabla_._vacio.setVisible(visibles == 0)
 
 
-def boton(texto: str, al_pulsar, estilo: str | None = None) -> QPushButton:
+def boton(texto: str, al_pulsar, estilo: str | None = None, icono: str | None = None) -> QPushButton:
+    """Botón redondeado; si su verbo tiene icono (Agregar, Editar, Importar...), lo lleva."""
     resultado = QPushButton(texto)
     # El contorno de foco aparece al usar Tab, no cada vez que se hace clic.
     resultado.setFocusPolicy(Qt.FocusPolicy.TabFocus)
     if estilo:
         resultado.setObjectName(estilo)
+    nombre_icono = icono or diseno.icono_de_boton(texto)
+    if nombre_icono:
+        resultado.setIcon(diseno.icono(nombre_icono, diseno.color_icono_de(estilo), aire=6))
+        resultado.setIconSize(QSize(22, 16))
     resultado.clicked.connect(al_pulsar)
     return resultado
 
@@ -215,10 +221,13 @@ def tabla(columnas: list[str], estirar: int | None = None, ordenable: bool = Tru
     for i, columna in enumerate(columnas):
         resultado.horizontalHeaderItem(i).setTextAlignment(alineacion_de(columna))
     resultado.setAlternatingRowColors(True)
+    resultado.setShowGrid(False)  # sin rejilla: los renglones alternos bastan para seguir la línea
     resultado.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
     resultado.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     resultado.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
     resultado.verticalHeader().setVisible(False)
+    resultado.verticalHeader().setDefaultSectionSize(34)  # renglones cómodos de leer y de atinar
+    diseno.sombra(resultado)
     encabezado = resultado.horizontalHeader()
     encabezado.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
     encabezado.setSectionResizeMode(

@@ -4,7 +4,7 @@ import sqlite3
 import threading
 from datetime import datetime
 
-from PySide6.QtCore import QObject, Qt, QTimer, Signal
+from PySide6.QtCore import QObject, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from .. import __version__, db, updater
 from ..paths import asset, data_dir, fotos_dir
 from .acceso import pedir_acceso
+from . import diseno
 from .comun import error, info, logo
 from .pagina_cobros import PaginaCobros
 from .pagina_config import PaginaConfig
@@ -143,9 +144,11 @@ class Ventana(QMainWindow):
         columna.addWidget(logo(ANCHO_BARRA - 28, ALTO_LOGO_COMPACTO if baja else ALTO_LOGO))
         columna.addSpacing(14)
 
-        def agregar(texto: str, pagina: QWidget):
+        def agregar(texto: str, pagina: QWidget, icono: str):
             self.pila.addWidget(pagina)
             nav = QPushButton(texto, objectName="nav", checkable=True)
+            nav.setIcon(diseno.icono_navegacion(icono))
+            nav.setIconSize(QSize(26, 18))
             nav.setFocusPolicy(Qt.FocusPolicy.TabFocus)
             nav.clicked.connect(lambda: self._mostrar(pagina))
             atajo = str((len(self._navegacion) + 1) % 10)
@@ -156,17 +159,17 @@ class Ventana(QMainWindow):
             columna.addWidget(nav)
             return nav
 
-        agregar("Inicio", self.inicio).click()
-        agregar("Ligas y categorías", self.ligas)
-        agregar("Equipos y jugadores", self.equipos)
-        agregar("Rol de juegos", self.rol)
-        agregar("Resultados", self.resultados)
-        agregar("Estadísticas", self.estadisticas)
-        agregar("Liguilla", self.liguilla)
-        agregar("Cobros", self.cobros)
-        agregar("Reportes", self.reportes)
+        agregar("Inicio", self.inicio, "inicio").click()
+        agregar("Ligas y categorías", self.ligas, "ligas")
+        agregar("Equipos y jugadores", self.equipos, "equipos")
+        agregar("Rol de juegos", self.rol, "rol")
+        agregar("Resultados", self.resultados, "resultados")
+        agregar("Estadísticas", self.estadisticas, "estadisticas")
+        agregar("Liguilla", self.liguilla, "liguilla")
+        agregar("Cobros", self.cobros, "cobros")
+        agregar("Reportes", self.reportes, "reportes")
         columna.addStretch(1)
-        agregar("Configuración", self.config)
+        agregar("Configuración", self.config, "configuracion")
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(self._enfocar_busqueda)
         QShortcut(QKeySequence("F5"), self).activated.connect(self._refrescar_pagina)
         return barra

@@ -69,21 +69,19 @@ QCheckBox, QRadioButton {{
 QCheckBox::indicator {{ width: 18px; height: 18px; }}
 QCheckBox:focus, QRadioButton:focus {{ border-color: {VERDE_ACTIVO}; }}
 
-QLabel#titulo {{
-    background: {BLANCO}; color: {VERDE_ACTIVO}; font-size: {_t(19)}; font-weight: 600;
-    padding: 10px 14px; border: 1px solid {BORDE}; border-bottom: 3px solid {DORADO};
-    border-radius: 6px;
-}}
+QLabel#titulo {{ color: {TEXTO}; font-size: {_t(24)}; font-weight: 700; padding: 0; background: transparent; }}
 QLabel#tituloAcceso {{ color: {VERDE_ACTIVO}; font-size: {_t(24)}; font-weight: 600; }}
-QFrame#tarjeta {{ background: {BLANCO}; border: 1px solid {BORDE}; border-radius: 8px; }}
+QFrame#tarjeta {{ background: {BLANCO}; border: 1px solid {CUADRICULA}; border-radius: 10px; }}
 QLabel#tarjetaNumero {{ color: {TEXTO}; font-size: {_t(30)}; font-weight: 600; }}
-QFrame#franja {{ background: {BLANCO}; border: 1px solid {BORDE}; border-radius: 8px; }}
+QFrame#franja {{ background: {BLANCO}; border: 1px solid {CUADRICULA}; border-radius: 10px; }}
 QFrame#separador {{ background: {BORDE}; margin: 10px 0; }}
 QLabel#datoNumero {{ color: {TEXTO}; font-size: {_t(22)}; font-weight: 600; }}
 QLabel#datoAlerta {{ color: {ROJO}; font-size: {_t(22)}; font-weight: 600; }}
 QLabel#datoTexto {{ color: {TEXTO_SUAVE}; }}
-QFrame#pendiente {{ background: {BLANCO}; border: 1px solid {BORDE}; border-radius: 6px; }}
-QFrame#pendienteAlerta {{ background: {ROJO_SUAVE}; border: 1px solid {BORDE_PELIGRO}; border-radius: 6px; }}
+QLabel#datoTitulo {{ color: {TEXTO_SUAVE}; font-size: {_t(12)}; }}
+QLabel#datoValor {{ color: {TEXTO}; font-weight: 600; }}
+QFrame#pendiente {{ background: {BLANCO}; border: 1px solid {CUADRICULA}; border-radius: 10px; }}
+QFrame#pendienteAlerta {{ background: {ROJO_SUAVE}; border: 1px solid {BORDE_PELIGRO}; border-radius: 10px; }}
 QLabel#vacio {{ color: {TEXTO_SUAVE}; background: transparent; }}
 QLabel#errorCampo {{ color: {ROJO}; }}
 QLineEdit[invalido="true"], QComboBox[invalido="true"], QSpinBox[invalido="true"],
@@ -95,15 +93,15 @@ QPushButton#mas::menu-indicator {{
     image: url("{FLECHA}"); width: 9px; height: 6px;
     subcontrol-origin: padding; subcontrol-position: right center; right: 9px;
 }}
-QMenu {{ background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE_CONTROL}; padding: 4px; }}
-QMenu::item {{ padding: 6px 18px; border-radius: 4px; }}
+QMenu {{ background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE}; border-radius: 10px; padding: 6px; }}
+QMenu::item {{ padding: 8px 18px; border-radius: 8px; }}
 QMenu::item:selected {{ background: {VERDE_SUAVE}; color: {TEXTO}; }}
 QTabWidget::pane {{ border: none; }}
 QTabBar::tab {{
-    background: transparent; color: {TEXTO_SUAVE}; padding: 6px 14px; margin-right: 4px;
-    border: none; border-bottom: 2px solid transparent; font-weight: 600;
+    background: transparent; color: {TEXTO_SUAVE}; padding: 7px 16px; margin-right: 6px;
+    border: 1px solid transparent; border-radius: 16px; font-weight: 600;
 }}
-QTabBar::tab:selected {{ color: {VERDE_ACTIVO}; border-bottom: 2px solid {VERDE}; }}
+QTabBar::tab:selected {{ color: {VERDE_ACTIVO}; background: {VERDE_SUAVE}; border-color: {VERDE_SUAVE}; }}
 QTabBar::tab:hover {{ color: {TEXTO}; }}
 QTabBar:focus {{ border: 1px solid {BARRA}; border-radius: 4px; }}
 QLabel#tarjetaAlerta {{ color: {ROJO}; font-size: {_t(30)}; font-weight: 600; }}
@@ -135,39 +133,35 @@ QLabel#codigo {{
 }}
 
 QPushButton#nav {{
-    background: transparent; color: {TEXTO_BARRA}; border: none; border-left: 4px solid transparent;
-    text-align: left; padding: 11px 14px; font-size: {_t(15)}; border-radius: 0;
+    background: transparent; color: {TEXTO_BARRA}; border: 2px solid transparent; border-radius: 20px;
+    text-align: left; padding: 8px 10px; margin: 1px 8px; font-size: {_t(15)}; font-weight: 400;
 }}
 QPushButton#nav:hover {{ background: {BARRA_HOVER}; }}
-QPushButton#nav:checked {{
-    background: {VERDE}; color: white; font-weight: 600; border-left: 4px solid {DORADO};
-}}
+QPushButton#nav:checked {{ background: {DORADO}; color: {BARRA}; font-weight: 700; }}
 QPushButton#nav:disabled {{ color: {TEXTO_BARRA_INACTIVO}; }}
-QPushButton#nav:focus {{
-    background: {BARRA_HOVER}; border: 2px solid {DORADO}; padding: 9px 12px 9px 16px;
-}}
-QPushButton#nav:checked:focus {{ background: {VERDE}; border: 2px solid white; }}
+QPushButton#nav:focus {{ border-color: {DORADO}; }}
+QPushButton#nav:checked:focus {{ border-color: white; }}
 
 QPushButton {{
-    background: {VERDE}; color: white; border: 1px solid {VERDE}; border-radius: 6px;
-    padding: 9px 14px; font-weight: 600;
+    background: {VERDE}; color: white; border: 1px solid {VERDE}; border-radius: 18px;
+    padding: 8px 16px; font-weight: 600;
 }}
 QPushButton:hover {{ background: {VERDE_ACTIVO}; border-color: {VERDE_ACTIVO}; }}
 QPushButton:pressed {{ background: {BARRA}; border-color: {BARRA}; }}
-QPushButton:focus {{ border: 2px solid {BARRA}; padding: 8px 13px; }}
+QPushButton:focus {{ border: 2px solid {BARRA}; padding: 7px 15px; }}
 QPushButton:disabled {{ background: {DESACTIVADO}; border-color: {DESACTIVADO}; color: {TEXTO_DESACTIVADO}; }}
 QPushButton#secundario, QPushButton#mas {{ background: {BLANCO}; color: {VERDE_ACTIVO}; border: 1px solid {BORDE_CONTROL}; }}
 QPushButton#secundario:hover, QPushButton#mas:hover {{ background: {VERDE_SUAVE}; border-color: {VERDE_ACTIVO}; }}
 QPushButton#secundario:pressed, QPushButton#mas:pressed {{ background: {VERDE_SUAVE}; }}
-QPushButton#secundario:focus, QPushButton#mas:focus {{ border: 2px solid {BARRA}; padding: 8px 13px; }}
+QPushButton#secundario:focus, QPushButton#mas:focus {{ border: 2px solid {BARRA}; padding: 7px 15px; }}
 QPushButton#peligro {{ background: {BLANCO}; color: {ROJO}; border: 1px solid {BORDE_PELIGRO}; }}
 QPushButton#peligro:hover {{ background: {ROJO_SUAVE}; border-color: {ROJO}; }}
 QPushButton#peligro:pressed {{ background: {ROJO_SUAVE}; }}
-QPushButton#peligro:focus {{ border: 2px solid {ROJO}; padding: 8px 13px; }}
+QPushButton#peligro:focus {{ border: 2px solid {ROJO}; padding: 7px 15px; }}
 
 QTableWidget {{
     background: {BLANCO}; alternate-background-color: {FILA_ALTERNA}; color: {TEXTO};
-    gridline-color: {CUADRICULA}; border: 1px solid {BORDE}; border-radius: 6px;
+    gridline-color: {CUADRICULA}; border: 1px solid {CUADRICULA}; border-radius: 10px;
     selection-background-color: {VERDE_SUAVE}; selection-color: {TEXTO};
 }}
 QTableWidget:focus {{ border: 2px solid {VERDE}; }}
@@ -176,13 +170,14 @@ QTableWidget::item:selected {{
     background: {VERDE_SUAVE}; color: {TEXTO};
     border-top: 1px solid {VERDE}; border-bottom: 1px solid {VERDE};
 }}
+QHeaderView {{ background: transparent; }}
 QHeaderView::section {{
-    background: {ENCABEZADO_TABLA}; color: {TEXTO}; font-weight: 600; padding: 7px 6px;
-    border: none; border-right: 1px solid {BORDE}; border-bottom: 1px solid {BORDE};
+    background: {BLANCO}; color: {TEXTO_SUAVE}; font-weight: 700; padding: 9px 6px;
+    border: none; border-bottom: 2px solid {CUADRICULA};
 }}
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit, QTimeEdit {{
     background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE_CONTROL};
-    border-radius: 5px; padding: 6px;
+    border-radius: 8px; padding: 6px;
 }}
 QLineEdit:focus, QComboBox:focus, QDoubleSpinBox:focus, QSpinBox:focus, QDateEdit:focus, QTimeEdit:focus {{
     border: 2px solid {VERDE}; padding: 5px;
@@ -204,7 +199,7 @@ QComboBox QAbstractItemView {{
     background: {BLANCO}; color: {TEXTO};
     selection-background-color: {VERDE_SUAVE}; selection-color: {TEXTO};
 }}
-QStatusBar {{ background: {VERDE_SUAVE}; color: {TEXTO}; font-weight: 600; min-height: 26px; }}
+QStatusBar {{ background: {VERDE_SUAVE}; color: {TEXTO}; font-weight: 600; min-height: 28px; }}
 QStatusBar QLabel {{ background: transparent; }}
 QToolTip {{ background: {BLANCO}; color: {TEXTO}; border: 1px solid {BORDE}; }}
 """

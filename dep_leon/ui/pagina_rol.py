@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import date
 
-from PySide6.QtCore import QDate, Qt, QTime
+from PySide6.QtCore import QDate, QTime
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import cobros, liguilla, rol
+from . import diseno
 from .comun import (
     ayuda_pagina,
     AvisoCampo,
@@ -290,9 +291,7 @@ class PaginaRol(QWidget):
         self.setObjectName("pagina")
         self.conn = conn
 
-        self.titulo = QLabel(
-            "Rol de juegos", objectName="titulo", alignment=Qt.AlignmentFlag.AlignCenter
-        )
+        self.titulo = QLabel("Rol de juegos", objectName="titulo")
         self.filtros = FiltrosLiga(conn, con_todas=True)
         self.liga, self.torneo, self.categoria = self.filtros.liga, self.filtros.torneo, self.filtros.categoria
         self.fecha = QComboBox()
@@ -315,7 +314,7 @@ class PaginaRol(QWidget):
         poner_vacio(self.tabla, "No hay partidos. Pulsa «Generar rol» para crearlos.")
         self.busqueda = campo_busqueda(self.tabla, "Buscar equipo", ancho=150)
 
-        acciones = QHBoxLayout()
+        acciones = diseno.FilaBotones()
         acciones.addWidget(boton("Generar rol", self.generar))
         acciones.addWidget(boton("Agregar partido", self.agregar, "secundario"))
         acciones.addWidget(boton("Editar o reprogramar", self.editar, "secundario"))
@@ -416,7 +415,7 @@ class PaginaRol(QWidget):
             partes = [rol.fecha_larga(date.fromisoformat(fecha))]
         if linea:
             partes.append(rol.titulo_torneo(linea))
-        self.titulo.setText("\n".join(partes))
+        self.titulo.setText(" · ".join(partes))
 
         if fecha and torneo:
             lista = rol.descansos(self.conn, torneo, fecha, categoria)

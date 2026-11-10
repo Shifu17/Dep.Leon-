@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import liguilla, rol
+from . import diseno
 from .comun import ayuda_pagina, boton, boton_mas, confirmar, error, etiqueta, info, llenar, tabla
 from .filtros import FiltrosLiga
 from .pagina_resultados import borrar_resultado, capturar_partido, marcar_no_presentado
@@ -72,7 +73,7 @@ class PaginaLiguilla(QWidget):
         self.hasta.valueChanged.connect(self.refrescar_clasificados)
         self.desempate_nuevo = _combo_desempate()
 
-        fila = QHBoxLayout()
+        fila = diseno.FilaBotones()
         fila.addWidget(etiqueta("Clasifican del lugar", self.desde))
         fila.addWidget(self.desde)
         fila.addWidget(etiqueta("al lugar", self.hasta))
@@ -100,7 +101,7 @@ class PaginaLiguilla(QWidget):
         self.desempate = _combo_desempate()
         self.desempate.activated.connect(self.cambiar_desempate)
 
-        acciones = QHBoxLayout()
+        acciones = diseno.FilaBotones()
         acciones.addWidget(boton("Programar partido", self.programar, "secundario"))
         acciones.addWidget(boton("Capturar resultado", self.capturar))
         acciones.addWidget(

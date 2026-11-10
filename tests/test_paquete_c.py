@@ -149,7 +149,7 @@ def test_sin_torneo_orienta_a_crearlo(ventana, app):
 def test_tablas_vacias_explican_que_hacer(ventana, app, conn, torneo_id, categoria):
     ventana._mostrar(ventana.equipos)
     ventana.equipos.refrescar()
-    assert "Pulsa «Agregar»" in _vacio(ventana.equipos.tabla_equipos)
+    assert "Pulsa «Agregar equipo»" in _vacio(ventana.equipos.tabla_equipos)
     assert "Selecciona un equipo" in _vacio(ventana.equipos.tabla_jugadores)
 
     crear_equipo(conn, torneo_id, categoria, "Águilas")

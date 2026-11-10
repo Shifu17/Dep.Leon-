@@ -303,7 +303,7 @@ def importar(
                     nuevos, actualizados, equipos = _registrar(
                         conn, registro.filas, torneo_id, fotos_dir, fotos,
                         {"responsable": registro.responsable, "asistente": registro.asistente,
-                         "director": registro.director},
+                         "director": registro.director, "rama": registro.rama.upper()},
                     )
                 totales[0] += nuevos
                 totales[1] += actualizados
@@ -544,7 +544,7 @@ def exportar(conn: sqlite3.Connection, equipo_id: int, destino: Path | str, foto
 
     for nombre, valor in (
         ("club", equipo["nombre"]), ("categoria", equipo["categoria"].upper()),
-        ("rama", credenciales.rama(f"{equipo['liga']} {equipo['categoria']}")),
+        ("rama", credenciales.rama_de(equipo)),
     ):
         if nombre in forma.datos:
             hoja.cell(*forma.datos[nombre], value=valor)

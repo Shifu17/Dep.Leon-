@@ -18,7 +18,7 @@ def aplicacion_con_tema() -> QApplication:
     """
     aplicacion = QApplication.instance() or QApplication([])
     if aplicacion.styleSheet() != ESTILO:
-        for fuente in ("segoeui", "segoeuib", "seguisb"):
+        for fuente in ("segoeui", "segoeuib", "seguisb", "segmdl2"):
             QFontDatabase.addApplicationFont(f"C:/Windows/Fonts/{fuente}.ttf")
         aplicacion.setFont(QFont("Segoe UI", 10))
         aplicacion.setStyleSheet(ESTILO)

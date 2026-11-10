@@ -103,8 +103,15 @@ repita el número de playera en un equipo.
 
 ### A mano
 
-Pulsa **Agregar equipo** (nombre, categoría, entrenador, asistente, director general y teléfono) y, con el
-equipo elegido, **Agregar jugador**.
+Pulsa **Agregar equipo**, arriba a la derecha (nombre del club, categoría, rama, entrenador, asistente,
+director general y teléfono) y, con el equipo elegido, **Agregar jugador** (número, nombre completo, fecha de
+nacimiento, CURP, posición y foto).
+
+### Cómo se ve un equipo
+
+Al tocar un equipo, la tarjeta de arriba muestra sus datos como vienen en la hoja de registro: club,
+categoría, rama, teléfono, entrenador, asistente, director general y en qué días puede jugar. Abajo están sus
+jugadores con número, nombre completo, fecha de nacimiento, CURP, asistencias y si tienen foto.
 
 Cada vez que guardas algo, la barra verde de abajo lo confirma, por ejemplo «Listo: jugador guardado.».
 

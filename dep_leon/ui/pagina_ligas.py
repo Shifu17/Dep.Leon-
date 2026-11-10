@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from . import diseno
 from .comun import (
     al_activar,
     boton,
@@ -172,7 +173,7 @@ class PaginaLigas(QWidget):
         columna = QVBoxLayout()
         columna.addWidget(QLabel(titulo, objectName="seccion"))
         columna.addWidget(tabla_)
-        fila = QHBoxLayout()
+        fila = diseno.FilaBotones()
         fila.addWidget(boton("Agregar", nuevo))
         fila.addWidget(boton("Editar", editar, "secundario"))
         fila.addWidget(boton("Eliminar", borrar, "peligro"))

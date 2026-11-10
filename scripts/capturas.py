@@ -48,11 +48,18 @@ def preparar(conn):
                     "INSERT INTO equipos (torneo_id, categoria_id, nombre) VALUES (?, ?, ?)",
                     (torneo, categorias[categoria], equipo),
                 ).lastrowid
+                # Datos inventados con la forma de la hoja de registro (la CURP no es de nadie).
+                conn.execute(
+                    "UPDATE equipos SET responsable = ?, asistente = ?, director = ?, rama = 'VARONIL', "
+                    "telefono = '8440000000' WHERE id = ?",
+                    (f"Entrenador {equipo}", f"Asistente {equipo}", "Dirección del club", equipo_id),
+                )
                 for numero in range(1, 6):
                     conn.execute(
-                        "INSERT INTO jugadores (equipo_id, nombre, fecha_nacimiento, numero) "
-                        "VALUES (?, ?, ?, ?)",
-                        (equipo_id, f"Jugador {numero} {equipo}", f"{categoria[:4]}-03-01", numero),
+                        "INSERT INTO jugadores (equipo_id, nombre, fecha_nacimiento, numero, curp) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (equipo_id, f"Jugador {numero} {equipo}", f"{categoria[:4]}-03-01", numero,
+                         f"XXXX{categoria[2:4]}0301HCLXXX{numero:02d}"),
                     )
     ids = [categorias[c] for c in EQUIPOS]
     cobros.guardar_tarifas(conn, torneo, {ids[0]: (15000, 120000), ids[1]: (12000, 100000)})
@@ -100,7 +107,7 @@ def main():
     DESTINO.mkdir(parents=True, exist_ok=True)
     updater.buscar = lambda actual: None
     app = QApplication([])
-    for fuente in ("segoeui", "segoeuib", "seguisb"):
+    for fuente in ("segoeui", "segoeuib", "seguisb", "segmdl2"):
         QFontDatabase.addApplicationFont(f"C:/Windows/Fonts/{fuente}.ttf")
     app.setFont(QFont("Segoe UI", 10))
     app.setStyle("Fusion")
